@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Data.SqlClient;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -7,13 +8,21 @@ namespace Triosik
 {
     public partial class DashboardGuest : Form
     {
-        Panel sidebar;
-        Panel contentPanel;
-        Panel wrapperPanel;
+        Panel sidebar, contentPanel, wrapperPanel;
         string activeMenu = "Dashboard";
 
         readonly Color Blue = Color.FromArgb(31, 126, 224);
         readonly Color Yellow = Color.FromArgb(255, 230, 55);
+        readonly Color Green = Color.FromArgb(120, 200, 145);
+        readonly Color Red = Color.FromArgb(235, 120, 140);
+        readonly Color Gray = Color.LightGray;
+
+        string connectionString = @"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Triosik;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=False;ApplicationIntent=ReadWrite;MultiSubnetFailover=False";
+
+        int selectedStudioId = 1;
+        int selectedHargaPerJam = 75000;
+        string selectedStudioName = "Studio 1";
+        Panel selectedStudioCard = null;
 
         public DashboardGuest()
         {
@@ -104,8 +113,7 @@ namespace Triosik
             menu.Cursor = Cursors.Hand;
             sidebar.Controls.Add(menu);
 
-            Image finalIcon = RecolorIcon(icon, active ? Blue : Color.White);
-            AddPic(menu, finalIcon, 17, 14, 26, 26);
+            AddPic(menu, RecolorIcon(icon, active ? Blue : Color.White), 17, 14, 26, 26);
 
             Label lbl = new Label();
             lbl.Text = text;
@@ -129,31 +137,6 @@ namespace Triosik
             };
         }
 
-        Image RecolorIcon(Image original, Color color)
-        {
-            Bitmap bmp = new Bitmap(original.Width, original.Height);
-
-            using (Graphics g = Graphics.FromImage(bmp))
-            {
-                g.DrawImage(original, 0, 0, original.Width, original.Height);
-            }
-
-            for (int y = 0; y < bmp.Height; y++)
-            {
-                for (int x = 0; x < bmp.Width; x++)
-                {
-                    Color px = bmp.GetPixel(x, y);
-
-                    if (px.A > 20)
-                    {
-                        bmp.SetPixel(x, y, Color.FromArgb(px.A, color.R, color.G, color.B));
-                    }
-                }
-            }
-
-            return bmp;
-        }
-
         void ShowDashboardPage()
         {
             wrapperPanel.Controls.Clear();
@@ -161,7 +144,6 @@ namespace Triosik
             Label title = new Label();
             title.Text = "Welcome, Guest!";
             title.Font = new Font("Chubby And Groovy", 42, FontStyle.Bold);
-            title.ForeColor = Color.Black;
             title.AutoSize = true;
             title.Location = new Point(55, 45);
             wrapperPanel.Controls.Add(title);
@@ -193,26 +175,9 @@ namespace Triosik
 
             AddPic(card, icon, 28, 25, 55, 55);
 
-            Label bigLbl = new Label();
-            bigLbl.Text = big;
-            bigLbl.Font = new Font("Anek Devanagari", 21, FontStyle.Bold);
-            bigLbl.AutoSize = true;
-            bigLbl.Location = new Point(28, 92);
-            card.Controls.Add(bigLbl);
-
-            Label titleLbl = new Label();
-            titleLbl.Text = title;
-            titleLbl.Font = new Font("Anek Devanagari", 13, FontStyle.Bold);
-            titleLbl.AutoSize = true;
-            titleLbl.Location = new Point(28, 132);
-            card.Controls.Add(titleLbl);
-
-            Label descLbl = new Label();
-            descLbl.Text = desc;
-            descLbl.Font = new Font("Anek Devanagari", 10);
-            descLbl.AutoSize = true;
-            descLbl.Location = new Point(28, 162);
-            card.Controls.Add(descLbl);
+            AddLabel(card, big, 28, 92, 21, true, Color.Black);
+            AddLabel(card, title, 28, 132, 13, true, Color.Black);
+            AddLabel(card, desc, 28, 162, 10, false, Color.Black);
         }
 
         void AddSchedulePanel()
@@ -221,26 +186,15 @@ namespace Triosik
             box.Location = new Point(15, 420);
             wrapperPanel.Controls.Add(box);
 
-            Label title = new Label();
-            title.Text = "Jadwal Hari Ini";
-            title.Font = new Font("Chubby And Groovy", 18);
-            title.AutoSize = true;
-            title.Location = new Point(30, 22);
-            box.Controls.Add(title);
+            AddLabel(box, "Jadwal Hari Ini", 30, 22, 18, true, Color.Black, "Chubby And Groovy");
 
-            Label lihat = new Label();
-            lihat.Text = "Lihat Semua";
-            lihat.Font = new Font("Anek Devanagari", 13);
-            lihat.ForeColor = Blue;
-            lihat.AutoSize = true;
-            lihat.Location = new Point(530, 25);
+            Label lihat = AddLabel(box, "Lihat Semua", 530, 25, 13, false, Blue);
             lihat.Cursor = Cursors.Hand;
             lihat.Click += (s, e) =>
             {
                 SetActiveMenu("Lihat Jadwal");
                 ShowSchedulePage();
             };
-            box.Controls.Add(lihat);
 
             AddScheduleRow(box, "09:00 - 10:00", 80);
             AddScheduleRow(box, "10:00 - 11:00", 138);
@@ -262,14 +216,7 @@ namespace Triosik
             };
 
             AddPic(row, Properties.Resources.clock, 20, 10, 25, 25);
-
-            Label lbl = new Label();
-            lbl.Text = time;
-            lbl.Font = new Font("Anek Devanagari", 14, FontStyle.Bold);
-            lbl.AutoSize = true;
-            lbl.Location = new Point(70, 9);
-            row.Controls.Add(lbl);
-
+            AddLabel(row, time, 70, 9, 14, true, Color.Black);
             AddPic(row, Properties.Resources.arrowblack, 535, 14, 22, 18);
         }
 
@@ -279,12 +226,7 @@ namespace Triosik
             box.Location = new Point(685, 420);
             wrapperPanel.Controls.Add(box);
 
-            Label title = new Label();
-            title.Text = "Kenapa Pilih Triosik?";
-            title.Font = new Font("Chubby And Groovy", 16);
-            title.AutoSize = true;
-            title.Location = new Point(25, 18);
-            box.Controls.Add(title);
+            AddLabel(box, "Kenapa Pilih Triosik?", 25, 18, 16, true, Color.Black, "Chubby And Groovy");
 
             AddWhyItem(box, Properties.Resources.Secureicon, "Peralatan Berkualitas", "Dilengkapi alat musik dan sound system terbaik.", 62);
             AddWhyItem(box, Properties.Resources.musicpurple, "Studio Nyaman", "Ruang kedap suara dan nyaman untuk berkreasi.", 105);
@@ -295,13 +237,7 @@ namespace Triosik
         void AddWhyItem(Panel p, Image icon, string title, string desc, int y)
         {
             AddPic(p, icon, 25, y, 30, 30);
-
-            Label lbl = new Label();
-            lbl.Text = title + "\n" + desc;
-            lbl.Font = new Font("Anek Devanagari", 9, FontStyle.Bold);
-            lbl.AutoSize = true;
-            lbl.Location = new Point(70, y - 2);
-            p.Controls.Add(lbl);
+            AddLabel(p, title + "\n" + desc, 70, y - 2, 9, true, Color.Black);
         }
 
         void AddBookingPanel()
@@ -310,33 +246,20 @@ namespace Triosik
             box.Location = new Point(685, 675);
             wrapperPanel.Controls.Add(box);
 
-            Label title = new Label();
-            title.Text = "Mulai Bermusik";
-            title.Font = new Font("Chubby And Groovy", 16);
-            title.AutoSize = true;
-            title.Location = new Point(25, 12);
-            box.Controls.Add(title);
+            AddLabel(box, "Mulai Bermusik", 25, 12, 16, true, Color.Black, "Chubby And Groovy");
 
             Panel btn = RoundedPanel(410, 52, 10, Color.FromArgb(225, 239, 255));
             btn.Location = new Point(25, 55);
             btn.Cursor = Cursors.Hand;
             btn.Click += (s, e) =>
             {
-                SetActiveMenu("Booking Sekarang");
+                SetActiveMenu("Booking Form");
                 ShowBookingPage();
             };
             box.Controls.Add(btn);
 
             AddPic(btn, Properties.Resources.mulaibookingicon, 20, 13, 27, 27);
-
-            Label text = new Label();
-            text.Text = "Booking Studio Sekarang";
-            text.Font = new Font("Anek Devanagari", 10, FontStyle.Bold);
-            text.ForeColor = Blue;
-            text.AutoSize = true;
-            text.Location = new Point(60, 17);
-            btn.Controls.Add(text);
-
+            AddLabel(btn, "Booking Studio Sekarang", 60, 17, 10, true, Blue);
             AddPic(btn, Properties.Resources.arrowblue, 380, 16, 22, 20);
         }
 
@@ -344,46 +267,24 @@ namespace Triosik
         {
             wrapperPanel.Controls.Clear();
 
-            Label title = new Label();
-            title.Text = "Schedule";
-            title.Font = new Font("Chubby And Groovy", 42, FontStyle.Bold);
-            title.ForeColor = Color.Black;
-            title.AutoSize = true;
-            title.Location = new Point(55, 45);
-            wrapperPanel.Controls.Add(title);
-
-            Label subtitle = new Label();
-            subtitle.Text = "Lihat semua jadwal studio yang tersedia hari ini.";
-            subtitle.Font = new Font("Anek Devanagari", 15);
-            subtitle.AutoSize = true;
-            subtitle.Location = new Point(60, 120);
-            wrapperPanel.Controls.Add(subtitle);
-
+            AddLabel(wrapperPanel, "Schedule", 55, 45, 42, true, Color.Black, "Chubby And Groovy");
+            AddLabel(wrapperPanel, "Lihat semua jadwal studio yang tersedia hari ini.", 60, 120, 15, false, Color.Black);
             AddPic(wrapperPanel, Properties.Resources.Hitam, 1090, 45, 95, 95);
 
             Panel filterBox = RoundedPanel(1120, 105, 15, Color.White);
-            filterBox.Location = new Point(45, 180);
+            filterBox.Location = new Point(45, 170);
             wrapperPanel.Controls.Add(filterBox);
 
-            Label tgl = new Label();
-            tgl.Text = "Pilih Tanggal";
-            tgl.Font = new Font("Anek Devanagari", 11);
-            tgl.Location = new Point(35, 18);
-            tgl.AutoSize = true;
-            filterBox.Controls.Add(tgl);
+            AddLabel(filterBox, "Pilih Tanggal", 35, 18, 11, false, Color.Black);
 
-            TextBox inputTanggal = new TextBox();
+            DateTimePicker inputTanggal = new DateTimePicker();
             inputTanggal.Location = new Point(35, 50);
             inputTanggal.Size = new Size(250, 34);
             inputTanggal.Font = new Font("Anek Devanagari", 12);
+            inputTanggal.Format = DateTimePickerFormat.Short;
             filterBox.Controls.Add(inputTanggal);
 
-            Label studio = new Label();
-            studio.Text = "Pilih Studio (Opsional)";
-            studio.Font = new Font("Anek Devanagari", 11);
-            studio.Location = new Point(330, 18);
-            studio.AutoSize = true;
-            filterBox.Controls.Add(studio);
+            AddLabel(filterBox, "Pilih Studio (Opsional)", 330, 18, 11, false, Color.Black);
 
             ComboBox cmbStudio = new ComboBox();
             cmbStudio.Location = new Point(330, 50);
@@ -397,266 +298,598 @@ namespace Triosik
             cmbStudio.SelectedIndex = 0;
             filterBox.Controls.Add(cmbStudio);
 
-            AddLegend(filterBox, Color.FromArgb(120, 200, 145), "Tersedia", 650);
-            AddLegend(filterBox, Color.FromArgb(235, 120, 140), "Terbooking", 760);
-            AddLegend(filterBox, Color.LightGray, "Tidak Tersedia", 880);
+            AddLegend(filterBox, Green, "Tersedia", 650);
+            AddLegend(filterBox, Red, "Dibooking", 760);
+            AddLegend(filterBox, Gray, "Tidak Tersedia", 870);
 
             Button cari = new Button();
+            cari.Text = "Cari";
             cari.Size = new Size(80, 38);
             cari.Location = new Point(1010, 45);
             cari.FlatStyle = FlatStyle.Flat;
             cari.BackColor = Color.White;
+            cari.Cursor = Cursors.Hand;
             filterBox.Controls.Add(cari);
 
-            Panel table = RoundedPanel(1120, 500, 15, Color.White);
-            table.Location = new Point(45, 305);
+            Panel table = RoundedPanel(1120, 525, 15, Color.White);
+            table.Location = new Point(45, 290);
             wrapperPanel.Controls.Add(table);
 
-            AddScheduleHeader(table);
-            AddScheduleTimeRows(table);
+            Action load = () =>
+            {
+                table.Controls.Clear();
+                AddScheduleHeader(table);
+                AddScheduleTimeRowsFromBooking(table, inputTanggal.Value.Date, cmbStudio.Text);
+            };
+
+            cari.Click += (s, e) => load();
+            load();
+        }
+
+        void AddScheduleHeader(Panel table)
+        {
+            AddLabel(table, "Waktu", 55, 30, 11, true, Color.Black);
+            AddStudioHeader(table, Green, "Studio 1", "(Regular)", 270);
+            AddStudioHeader(table, Color.FromArgb(255, 225, 120), "Studio 2", "(VIP)", 580);
+            AddStudioHeader(table, Color.FromArgb(255, 120, 90), "Studio Utama", "(VVIP)", 900);
+        }
+
+        void AddStudioHeader(Panel table, Color color, string name, string type, int x)
+        {
+            Panel dot = new Panel();
+            dot.Size = new Size(13, 13);
+            dot.Location = new Point(x, 30);
+            dot.BackColor = color;
+            table.Controls.Add(dot);
+
+            AddLabel(table, name, x + 20, 23, 10, true, Color.Black);
+            AddLabel(table, type, x + 20, 42, 8, false, Color.Black);
+        }
+
+        void AddScheduleTimeRowsFromBooking(Panel table, DateTime tanggal, string studioFilter)
+        {
+            string[] times =
+            {
+                "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00",
+                "12:00 - 13:00", "13:00 - 14:00", "14:00 - 15:00",
+                "15:00 - 16:00", "16:00 - 17:00", "17:00 - 18:00",
+                "18:00 - 19:00", "19:00 - 20:00", "20:00 - 21:00",
+                "21:00 - 22:00"
+            };
+
+            int y = 80;
+
+            foreach (string time in times)
+            {
+                string[] split = time.Split('-');
+                TimeSpan mulai = TimeSpan.Parse(split[0].Trim());
+                TimeSpan selesai = TimeSpan.Parse(split[1].Trim());
+
+                AddLabel(table, time, 55, y, 11, false, Color.Black);
+
+                AddStatusCard(table, 245, y - 5, CekStatusStudio(1, tanggal, mulai, selesai, studioFilter));
+                AddStatusCard(table, 555, y - 5, CekStatusStudio(2, tanggal, mulai, selesai, studioFilter));
+                AddStatusCard(table, 875, y - 5, CekStatusStudio(3, tanggal, mulai, selesai, studioFilter));
+
+                y += 34;
+            }
+        }
+
+        string CekStatusStudio(int idStudio, DateTime tanggal, TimeSpan mulai, TimeSpan selesai, string studioFilter)
+        {
+            if (studioFilter == "Studio 1" && idStudio != 1) return "Tidak Tersedia";
+            if (studioFilter == "Studio 2" && idStudio != 2) return "Tidak Tersedia";
+            if (studioFilter == "Studio Utama" && idStudio != 3) return "Tidak Tersedia";
+
+            if (mulai < TimeSpan.Parse("09:00") || selesai > TimeSpan.Parse("22:00"))
+                return "Tidak Tersedia";
+
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(connectionString))
+                {
+                    conn.Open();
+
+                    string statusStudioQuery = "SELECT status FROM dbo.Studio WHERE id_studio = @id_studio";
+                    SqlCommand statusCmd = new SqlCommand(statusStudioQuery, conn);
+                    statusCmd.Parameters.AddWithValue("@id_studio", idStudio);
+
+                    object statusObj = statusCmd.ExecuteScalar();
+                    if (statusObj == null || statusObj.ToString() != "Aktif")
+                        return "Tidak Tersedia";
+
+                    string query = @"
+                    SELECT COUNT(*)
+                    FROM dbo.Booking
+                    WHERE id_studio = @id_studio
+                    AND tanggal = @tanggal
+                    AND status_booking <> 'Dibatalkan'
+                    AND (
+                        @mulai < jam_selesai
+                        AND @selesai > jam_mulai
+                    )";
+
+                    SqlCommand cmd = new SqlCommand(query, conn);
+                    cmd.Parameters.AddWithValue("@id_studio", idStudio);
+                    cmd.Parameters.AddWithValue("@tanggal", tanggal.Date);
+                    cmd.Parameters.AddWithValue("@mulai", mulai);
+                    cmd.Parameters.AddWithValue("@selesai", selesai);
+
+                    int count = (int)cmd.ExecuteScalar();
+
+                    return count > 0 ? "Dibooking" : "Tersedia";
+                }
+            }
+            catch
+            {
+                return "Tidak Tersedia";
+            }
+        }
+
+        void AddStatusCard(Control parent, int x, int y, string status)
+        {
+            Color bg = Green;
+            Color fg = Color.White;
+
+            if (status == "Dibooking") bg = Red;
+            if (status == "Tidak Tersedia")
+            {
+                bg = Gray;
+                fg = Color.Black;
+            }
+
+            Panel card = RoundedPanel(145, 27, 9, bg);
+            card.Location = new Point(x, y);
+            parent.Controls.Add(card);
+
+            Label lbl = new Label();
+            lbl.Text = status;
+            lbl.Font = new Font("Anek Devanagari", 8, FontStyle.Bold);
+            lbl.ForeColor = fg;
+            lbl.AutoSize = false;
+            lbl.TextAlign = ContentAlignment.MiddleCenter;
+            lbl.Dock = DockStyle.Fill;
+            card.Controls.Add(lbl);
         }
 
         void ShowBookingPage()
         {
             wrapperPanel.Controls.Clear();
+            selectedStudioCard = null;
 
             AddPic(wrapperPanel, Properties.Resources.Hitam, 1030, 15, 95, 95);
 
-            Label title = new Label();
-            title.Text = "Booking Form";
-            title.Font = new Font("Chubby And Groovy", 42, FontStyle.Bold);
-            title.ForeColor = Color.Black;
-            title.AutoSize = true;
-            title.Location = new Point(55, 45);
-            wrapperPanel.Controls.Add(title);
-
-            Label subtitle = new Label();
-            subtitle.Text = "Isi Form dibawah ini untuk melakukan pemesanan studio.";
-            subtitle.Font = new Font("Anek Devanagari", 13);
-            subtitle.AutoSize = true;
-            subtitle.Location = new Point(60, 120);
-            wrapperPanel.Controls.Add(subtitle);
+            AddLabel(wrapperPanel, "Booking Form", 55, 45, 42, true, Color.Black, "Chubby And Groovy");
+            AddLabel(wrapperPanel, "Isi Form dibawah ini untuk melakukan pemesanan studio.", 60, 120, 13, false, Color.Black);
 
             Panel formBox = RoundedPanel(650, 650, 15, Color.White);
             formBox.Location = new Point(40, 165);
             wrapperPanel.Controls.Add(formBox);
 
-            Label formTitle = new Label();
-            formTitle.Text = "Form Booking";
-            formTitle.Font = new Font("Anek Devanagari", 13, FontStyle.Bold);
-            formTitle.ForeColor = Color.FromArgb(66, 132, 245);
-            formTitle.AutoSize = true;
-            formTitle.Location = new Point(28, 25);
-            formBox.Controls.Add(formTitle);
+            AddLabel(formBox, "Form Booking", 28, 20, 13, true, Color.FromArgb(66, 132, 245));
 
-            AddBookingSectionTitle(formBox, Properties.Resources.Jadwalicon, "Pilih Tanggal", 72);
+            AddSmallLabel(formBox, "Nama Pemesan", 32, 52);
+            TextBox txtNama = new TextBox();
+            txtNama.Location = new Point(32, 77);
+            txtNama.Size = new Size(260, 32);
+            txtNama.Font = new Font("Anek Devanagari", 10);
+            formBox.Controls.Add(txtNama);
+
+            AddSmallLabel(formBox, "No HP", 320, 52);
+            TextBox txtNoHp = new TextBox();
+            txtNoHp.Location = new Point(320, 77);
+            txtNoHp.Size = new Size(260, 32);
+            txtNoHp.Font = new Font("Anek Devanagari", 10);
+            formBox.Controls.Add(txtNoHp);
+
+            AddBookingSectionTitle(formBox, Properties.Resources.Jadwalicon, "Pilih Tanggal", 125);
             DateTimePicker tanggal = new DateTimePicker();
-            tanggal.Location = new Point(32, 105);
-            tanggal.Size = new Size(260, 34);
-            tanggal.Font = new Font("Anek Devanagari", 11);
+            tanggal.Location = new Point(32, 158);
+            tanggal.Size = new Size(260, 32);
+            tanggal.Font = new Font("Anek Devanagari", 10);
             tanggal.Format = DateTimePickerFormat.Short;
             formBox.Controls.Add(tanggal);
 
-            AddBookingSectionTitle(formBox, Properties.Resources.card3icon, "Pilih Studio", 155);
+            AddBookingSectionTitle(formBox, Properties.Resources.card3icon, "Pilih Studio", 205);
 
-            AddStudioCard(formBox, 32, 188, "Studio 1", "(Regular)", Color.FromArgb(105, 198, 145), "🥁");
-            AddStudioCard(formBox, 237, 188, "Studio 2", "(VIP)", Color.FromArgb(255, 205, 69), "🎤");
-            AddStudioCard(formBox, 442, 188, "Studio Utama", "(VVIP)", Color.FromArgb(255, 124, 85), "🎸");
+            Panel card1 = AddStudioCard(formBox, 32, 238, 1, "Studio 1", "(Regular)", 50000, Green, "🥁");
+            Panel card2 = AddStudioCard(formBox, 237, 238, 2, "Studio 2", "(VIP)", 60000, Color.FromArgb(255, 205, 69), "🎤");
+            Panel card3 = AddStudioCard(formBox, 442, 238, 3, "Studio Utama", "(VVIP)", 70000, Color.FromArgb(255, 124, 85), "🎸");
 
-            AddBookingSectionTitle(formBox, Properties.Resources.clock, "Pilih Waktu", 315);
+            AddBookingSectionTitle(formBox, Properties.Resources.clock, "Pilih Waktu", 365);
 
-            Label dari = new Label();
-            dari.Text = "Dari";
-            dari.Font = new Font("Anek Devanagari", 9);
-            dari.AutoSize = true;
-            dari.Location = new Point(32, 348);
-            formBox.Controls.Add(dari);
-
+            AddSmallLabel(formBox, "Dari", 32, 398);
             ComboBox cmbDari = new ComboBox();
-            cmbDari.Location = new Point(32, 375);
-            cmbDari.Size = new Size(180, 34);
-            cmbDari.Font = new Font("Anek Devanagari", 11);
+            cmbDari.Location = new Point(32, 425);
+            cmbDari.Size = new Size(180, 32);
+            cmbDari.Font = new Font("Anek Devanagari", 10);
             cmbDari.DropDownStyle = ComboBoxStyle.DropDownList;
             cmbDari.Items.AddRange(new object[]
             {
-        "09:00", "10:00", "11:00", "12:00", "13:00", "14:00",
-        "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"
+                "09:00", "10:00", "11:00", "12:00", "13:00", "14:00",
+                "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00"
             });
             cmbDari.SelectedIndex = 0;
             formBox.Controls.Add(cmbDari);
 
-            Label sampai = new Label();
-            sampai.Text = "Sampai";
-            sampai.Font = new Font("Anek Devanagari", 9);
-            sampai.AutoSize = true;
-            sampai.Location = new Point(230, 348);
-            formBox.Controls.Add(sampai);
-
+            AddSmallLabel(formBox, "Sampai", 230, 398);
             ComboBox cmbSampai = new ComboBox();
-            cmbSampai.Location = new Point(230, 375);
-            cmbSampai.Size = new Size(180, 34);
-            cmbSampai.Font = new Font("Anek Devanagari", 11);
+            cmbSampai.Location = new Point(230, 425);
+            cmbSampai.Size = new Size(180, 32);
+            cmbSampai.Font = new Font("Anek Devanagari", 10);
             cmbSampai.DropDownStyle = ComboBoxStyle.DropDownList;
             cmbSampai.Items.AddRange(new object[]
             {
-        "10:00", "11:00", "12:00", "13:00", "14:00", "15:00",
-        "16:00", "17:00", "18:00", "19:00", "20:00", "21:00"
+                "10:00", "11:00", "12:00", "13:00", "14:00", "15:00",
+                "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00"
             });
             cmbSampai.SelectedIndex = 0;
             formBox.Controls.Add(cmbSampai);
 
-            AddBookingSectionTitle(formBox, null, "Pilih Layanan Tambahan (Opsional)", 430);
+            AddBookingSectionTitle(formBox, null, "Pilih Layanan Tambahan (Opsional)", 470);
 
-            CheckBox alat = AddServiceBox(formBox, 32, 470, "Sewa Alat", "Rp 25.000");
-            CheckBox rekam = AddServiceBox(formBox, 185, 470, "Recording", "Rp 50.000");
-            CheckBox mixing = AddServiceBox(formBox, 338, 470, "Mixing", "Rp 75.000");
+            CheckBox alat = AddServiceBox(formBox, 32, 510, "Extra Mic", "Rp 5.000");
+            CheckBox rekam = AddServiceBox(formBox, 185, 510, "Keyboard", "Rp 10.000");
+            CheckBox mixing = AddServiceBox(formBox, 338, 510, "Recording", "Rp 75.000");
 
-            AddBookingSectionTitle(formBox, null, "Catatan (Opsional)", 550);
+            AddBookingSectionTitle(formBox, null, "Catatan (Opsional)", 585);
 
             TextBox catatan = new TextBox();
-            catatan.Location = new Point(32, 585);
-            catatan.Size = new Size(570, 55);
-            catatan.Font = new Font("Anek Devanagari", 11);
-            catatan.Multiline = true;
+            catatan.Location = new Point(32, 615);
+            catatan.Size = new Size(570, 22);
+            catatan.Font = new Font("Anek Devanagari", 10);
             catatan.BorderStyle = BorderStyle.FixedSingle;
             formBox.Controls.Add(catatan);
-
-            Button btnBooking = new Button();
-            btnBooking.Text = "Booking Sekarang";
-            btnBooking.Font = new Font("Anek Devanagari", 12, FontStyle.Bold);
-            btnBooking.Size = new Size(570, 45);
-            btnBooking.Location = new Point(32, 715);
-            btnBooking.FlatStyle = FlatStyle.Flat;
-            btnBooking.FlatAppearance.BorderSize = 0;
-            btnBooking.BackColor = Yellow;
-            btnBooking.ForeColor = Color.Black;
-            btnBooking.Cursor = Cursors.Hand;
-            formBox.Controls.Add(btnBooking);
 
             Panel rightBox = RoundedPanel(438, 650, 15, Color.White);
             rightBox.Location = new Point(710, 165);
             wrapperPanel.Controls.Add(rightBox);
 
-            Panel summaryHead = RoundedPanel(398, 128, 15, Color.FromArgb(232, 241, 255));
+            Panel summaryHead = RoundedPanel(398, 98, 15, Color.FromArgb(232, 241, 255));
             summaryHead.Location = new Point(20, 22);
             rightBox.Controls.Add(summaryHead);
 
-            Label sumTitle = new Label();
-            sumTitle.Text = "Ringkasan Booking";
-            sumTitle.Font = new Font("Anek Devanagari", 13, FontStyle.Bold);
-            sumTitle.ForeColor = Color.FromArgb(66, 132, 245);
-            sumTitle.AutoSize = true;
-            sumTitle.Location = new Point(18, 18);
-            summaryHead.Controls.Add(sumTitle);
+            AddLabel(summaryHead, "Ringkasan Booking", 105, 18, 13, true, Color.FromArgb(66, 132, 245));
+            AddLabel(summaryHead, "Studio dan total harga akan berubah otomatis.", 65, 55, 9, false, Color.Black);
 
-            Panel summary = RoundedPanel(398, 345, 12, Color.White);
+            Panel summary = RoundedPanel(398, 280, 12, Color.White);
             summary.Location = new Point(20, 150);
             rightBox.Controls.Add(summary);
 
-            AddSummaryRow(summary, Properties.Resources.Jadwalicon, "Tanggal", "-", 25);
-            AddSummaryRow(summary, Properties.Resources.clock, "Waktu", "-", 65);
-            AddSummaryRow(summary, Properties.Resources.Bookingicon, "Layanan Tambahan", "-", 105);
+            Label valStudio = AddSummaryRow(summary, Properties.Resources.card3icon, "Studio", "-", 0);
+            Label valTanggal = AddSummaryRow(summary, Properties.Resources.Jadwalicon, "Tanggal", "-", 35);
+            Label valWaktu = AddSummaryRow(summary, Properties.Resources.clock, "Waktu", "-", 70);
+            Label valLayanan = AddSummaryRow(summary, Properties.Resources.Bookingicon, "Tambahan", "-", 105);
 
-            AddLine(summary, 0, 160, 398);
+            AddLine(summary, 0, 150, 398);
 
-            Label subtotal = new Label();
-            subtotal.Text = "Subtotal Studio";
-            subtotal.Font = new Font("Anek Devanagari", 10);
-            subtotal.AutoSize = true;
-            subtotal.Location = new Point(25, 190);
-            summary.Controls.Add(subtotal);
+            AddLabel(summary, "Subtotal Studio", 25, 175, 10, false, Color.Black);
+            Label subtotalPrice = AddLabel(summary, "Rp 0", 285, 175, 10, true, Color.Black);
 
-            Label subtotalPrice = new Label();
-            subtotalPrice.Text = "Rp 0";
-            subtotalPrice.Font = new Font("Anek Devanagari", 10, FontStyle.Bold);
-            subtotalPrice.AutoSize = true;
-            subtotalPrice.Location = new Point(295, 190);
-            summary.Controls.Add(subtotalPrice);
+            AddLine(summary, 0, 215, 398);
 
-            AddLine(summary, 0, 278, 398);
+            AddLabel(summary, "Total", 25, 235, 12, true, Color.Black);
+            Label totalPrice = AddLabel(summary, "Rp 0", 285, 235, 12, true, Color.Black);
 
-            Label total = new Label();
-            total.Text = "Total";
-            total.Font = new Font("Anek Devanagari", 12, FontStyle.Bold);
-            total.AutoSize = true;
-            total.Location = new Point(25, 300);
-            summary.Controls.Add(total);
+            AddLine(summary, 0, 275, 398);
 
-            Label totalPrice = new Label();
-            totalPrice.Text = "Rp 0";
-            totalPrice.Font = new Font("Anek Devanagari", 12, FontStyle.Bold);
-            totalPrice.AutoSize = true;
-            totalPrice.Location = new Point(295, 300);
-            summary.Controls.Add(totalPrice);
+            AddLabel(rightBox, "Metode Pembayaran", 28, 445, 11, true, Color.Black);
 
-            Panel infoBox = RoundedPanel(398, 123, 14, Color.FromArgb(255, 251, 235));
-            infoBox.Location = new Point(20, 515);
+            ComboBox cmbBayar = new ComboBox();
+            cmbBayar.Location = new Point(28, 475);
+            cmbBayar.Size = new Size(180, 54);
+            cmbBayar.Font = new Font("Anek Devanagari", 10);
+            cmbBayar.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbBayar.Items.Add("Cash");
+            cmbBayar.Items.Add("QRIS");
+            cmbBayar.SelectedIndex = 0;
+            rightBox.Controls.Add(cmbBayar);
+
+            Button btnBooking = new Button();
+            btnBooking.Text = "Bayar";
+            btnBooking.Font = new Font("Anek Devanagari", 11, FontStyle.Bold);
+            btnBooking.Size = new Size(398, 45);
+            btnBooking.Location = new Point(20, 520);
+            btnBooking.FlatStyle = FlatStyle.Flat;
+            btnBooking.FlatAppearance.BorderSize = 0;
+            btnBooking.BackColor = Yellow;
+            btnBooking.ForeColor = Color.Black;
+            btnBooking.Cursor = Cursors.Hand;
+            rightBox.Controls.Add(btnBooking);
+
+            Panel infoBox = RoundedPanel(398, 45, 14, Color.FromArgb(255, 251, 235));
+            infoBox.Location = new Point(20, 585);
             rightBox.Controls.Add(infoBox);
 
-            Label infoTitle = new Label();
-            infoTitle.Text = "✦  Informasi";
-            infoTitle.Font = new Font("Anek Devanagari", 10, FontStyle.Bold);
-            infoTitle.AutoSize = true;
-            infoTitle.Location = new Point(20, 15);
-            infoBox.Controls.Add(infoTitle);
+            AddLabel(infoBox, "✦ Silahkan Isi Form Booking Dengan Lengkap.", 18, 13, 9, true, Color.Black);
 
-            Label infoText = new Label();
-            infoText.Text = "• Pembayaran harus dilakukan dalam 15 menit\n• Booking akan otomatis dibatalkan jika pembayaran\n  tidak berhasil";
-            infoText.Font = new Font("Anek Devanagari", 9);
-            infoText.AutoSize = true;
-            infoText.Location = new Point(25, 45);
-            infoBox.Controls.Add(infoText);
+            Action updateSummary = () =>
+            {
+                TimeSpan mulai = TimeSpan.Parse(cmbDari.Text);
+                TimeSpan selesai = TimeSpan.Parse(cmbSampai.Text);
 
-            Panel secureBox = RoundedPanel(398, 70, 14, Color.FromArgb(238, 250, 240));
-            secureBox.Location = new Point(20, 655);
-            rightBox.Controls.Add(secureBox);
+                int durasi = selesai > mulai ? (int)(selesai - mulai).TotalHours : 0;
+                int subtotalStudio = durasi * selectedHargaPerJam;
+                int totalHarga = subtotalStudio;
 
-            Label safeTitle = new Label();
-            safeTitle.Text = "🛡  Keamanan Terjamin";
-            safeTitle.Font = new Font("Anek Devanagari", 10, FontStyle.Bold);
-            safeTitle.AutoSize = true;
-            safeTitle.Location = new Point(18, 14);
-            secureBox.Controls.Add(safeTitle);
+                string layanan = "";
+                if (alat.Checked)
+                {
+                    totalHarga += 5000;
+                    layanan += "Mic, ";
+                }
+                if (rekam.Checked)
+                {
+                    totalHarga += 10000;
+                    layanan += "Keyboard, ";
+                }
+                if (mixing.Checked)
+                {
+                    totalHarga += 75000;
+                    layanan += "Recording, ";
+                }
 
-            Label safeText = new Label();
-            safeText.Text = "Data dan pembayaran kamu aman bersama kami";
-            safeText.Font = new Font("Anek Devanagari", 9);
-            safeText.AutoSize = true;
-            safeText.Location = new Point(18, 40);
-            secureBox.Controls.Add(safeText);
+                if (layanan.EndsWith(", "))
+                    layanan = layanan.Substring(0, layanan.Length - 2);
+
+                valStudio.Text = selectedStudioName;
+                valTanggal.Text = tanggal.Value.ToString("dd/MM/yyyy");
+                valWaktu.Text = cmbDari.Text + " - " + cmbSampai.Text;
+                valLayanan.Text = layanan == "" ? "-" : layanan;
+                subtotalPrice.Text = FormatRupiah(subtotalStudio);
+                totalPrice.Text = FormatRupiah(totalHarga);
+            };
+
+            SelectStudioCard(card1, 1, "Studio 1", 50000);
+            updateSummary();
+
+            tanggal.ValueChanged += (s, e) => updateSummary();
+            cmbDari.SelectedIndexChanged += (s, e) => updateSummary();
+            cmbSampai.SelectedIndexChanged += (s, e) => updateSummary();
+            alat.CheckedChanged += (s, e) => updateSummary();
+            rekam.CheckedChanged += (s, e) => updateSummary();
+            mixing.CheckedChanged += (s, e) => updateSummary();
+
+            card1.Click += (s, e) => { AnimateClick(card1); SelectStudioCard(card1, 1, "Studio 1", 50000); updateSummary(); };
+            card2.Click += (s, e) => { AnimateClick(card2); SelectStudioCard(card2, 2, "Studio 2", 60000); updateSummary(); };
+            card3.Click += (s, e) => { AnimateClick(card3); SelectStudioCard(card3, 3, "Studio Utama", 70000); updateSummary(); };
+
+            btnBooking.Click += (s, e) =>
+            {
+                if (txtNama.Text.Trim() == "" || txtNoHp.Text.Trim() == "")
+                {
+                    MessageBox.Show("Nama pemesan dan No HP wajib diisi.");
+                    return;
+                }
+
+                TimeSpan jamMulai = TimeSpan.Parse(cmbDari.Text);
+                TimeSpan jamSelesai = TimeSpan.Parse(cmbSampai.Text);
+
+                if (jamSelesai <= jamMulai)
+                {
+                    MessageBox.Show("Jam selesai harus lebih besar dari jam mulai.");
+                    return;
+                }
+
+                int durasi = (int)(jamSelesai - jamMulai).TotalHours;
+                int totalHarga = HitungTotal(jamMulai, jamSelesai, alat.Checked, rekam.Checked, mixing.Checked);
+
+                string metode = cmbBayar.Text;
+
+                bool yakin = ShowConfirmNotif(
+    "Konfirmasi Booking",
+    "Studio: " + selectedStudioName +
+    "\nTanggal: " + tanggal.Value.ToString("dd/MM/yyyy") +
+    "\nJam: " + cmbDari.Text + " - " + cmbSampai.Text +
+    "\nTotal: " + FormatRupiah(totalHarga) +
+    "\nMetode: " + metode
+);
+
+                if (!yakin)
+                    return;
+
+                bool sukses = SimpanBooking(
+                    txtNama.Text.Trim(),
+                    txtNoHp.Text.Trim(),
+                    selectedStudioId,
+                    tanggal.Value.Date,
+                    jamMulai,
+                    jamSelesai,
+                    durasi,
+                    totalHarga,
+                    metode
+                );
+
+                if (sukses)
+                {
+                    if (metode == "QRIS")
+                        ShowQRISBill(txtNama.Text.Trim(), selectedStudioName, tanggal.Value.Date, cmbDari.Text + " - " + cmbSampai.Text, totalHarga);
+                    else
+                        ShowCashBill(txtNama.Text.Trim(), selectedStudioName, tanggal.Value.Date, cmbDari.Text + " - " + cmbSampai.Text, totalHarga);
+                }
+            };
         }
 
-        void AddBookingSectionTitle(Control parent, Image icon, string text, int y)
+        int HitungTotal(TimeSpan mulai, TimeSpan selesai, bool alat, bool rekam, bool mixing)
         {
-            if (icon != null)
-            {
-                AddPic(parent, RecolorIcon(icon, Blue), 28, y, 24, 24);
-            }
-            else
-            {
-                Label plus = new Label();
-                plus.Text = "+";
-                plus.Font = new Font("Anek Devanagari", 18, FontStyle.Bold);
-                plus.ForeColor = Blue;
-                plus.AutoSize = true;
-                plus.Location = new Point(30, y - 5);
-                parent.Controls.Add(plus);
-            }
+            int durasi = selesai > mulai ? (int)(selesai - mulai).TotalHours : 0;
+            int total = durasi * selectedHargaPerJam;
 
-            Label lbl = new Label();
-            lbl.Text = text;
-            lbl.Font = new Font("Anek Devanagari", 10);
-            lbl.AutoSize = true;
-            lbl.Location = new Point(62, y + 3);
-            parent.Controls.Add(lbl);
+            if (alat) total += 5000;
+            if (rekam) total += 10000;
+            if (mixing) total += 75000;
+
+            return total;
         }
 
-        Panel AddStudioCard(Control parent, int x, int y, string name, string type, Color dotColor, string emoji)
+        bool SimpanBooking(string nama, string noHp, int idStudio, DateTime tanggal,
+                   TimeSpan jamMulai, TimeSpan jamSelesai, int durasi, int totalHarga, string metode)
+        {
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(connectionString))
+                {
+                    conn.Open();
+
+                    string cekQuery = @"
+                    SELECT COUNT(*) 
+                    FROM dbo.Booking
+                    WHERE id_studio = @id_studio
+                    AND tanggal = @tanggal
+                    AND status_booking <> 'Dibatalkan'
+                    AND (
+                        @jam_mulai < jam_selesai 
+                        AND @jam_selesai > jam_mulai
+                    )";
+
+                    SqlCommand cekCmd = new SqlCommand(cekQuery, conn);
+                    cekCmd.Parameters.AddWithValue("@id_studio", idStudio);
+                    cekCmd.Parameters.AddWithValue("@tanggal", tanggal.Date);
+                    cekCmd.Parameters.AddWithValue("@jam_mulai", jamMulai);
+                    cekCmd.Parameters.AddWithValue("@jam_selesai", jamSelesai);
+
+                    int bentrok = (int)cekCmd.ExecuteScalar();
+
+                    if (bentrok > 0)
+                    {
+                        MessageBox.Show("Jadwal sudah dibooking. Pilih jam lain.");
+                        return false;
+                    }
+
+                    string insertQuery = @"
+                    INSERT INTO dbo.Booking
+                    (nama_pemesan, no_hp, id_studio, tanggal, jam_mulai, jam_selesai, durasi, total_harga, metode_pembayaran)
+                    VALUES
+                    (@nama, @no_hp, @id_studio, @tanggal, @jam_mulai, @jam_selesai, @durasi, @total_harga, @metode_pembayaran)";
+
+                    SqlCommand cmd = new SqlCommand(insertQuery, conn);
+                    cmd.Parameters.AddWithValue("@nama", nama);
+                    cmd.Parameters.AddWithValue("@no_hp", noHp);
+                    cmd.Parameters.AddWithValue("@id_studio", idStudio);
+                    cmd.Parameters.AddWithValue("@tanggal", tanggal.Date);
+                    cmd.Parameters.AddWithValue("@jam_mulai", jamMulai);
+                    cmd.Parameters.AddWithValue("@jam_selesai", jamSelesai);
+                    cmd.Parameters.AddWithValue("@durasi", durasi);
+                    cmd.Parameters.AddWithValue("@total_harga", totalHarga);
+                    cmd.Parameters.AddWithValue("@metode_pembayaran", metode);
+
+                    cmd.ExecuteNonQuery();
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Gagal menyimpan booking:\n" + ex.Message);
+                return false;
+            }
+        }
+
+        void ShowCashBill(string nama, string studio, DateTime tanggal, string waktu, int total)
+        {
+            MessageBox.Show(
+                "BOOKING BERHASIL\n\n" +
+                "Nama: " + nama +
+                "\nStudio: " + studio +
+                "\nTanggal: " + tanggal.ToString("dd/MM/yyyy") +
+                "\nWaktu: " + waktu +
+                "\nTotal: " + FormatRupiah(total) +
+                "\n\nSilakan bayar ke kasir studio.",
+                "Bill Cash",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information
+            );
+        }
+
+        void ShowQRISBill(string nama, string studio, DateTime tanggal, string waktu, int total)
+        {
+            Form qrForm = new Form();
+            qrForm.Text = "Pembayaran QRIS";
+            qrForm.Size = new Size(420, 560);
+            qrForm.StartPosition = FormStartPosition.CenterScreen;
+            qrForm.BackColor = Color.White;
+
+            Label title = new Label();
+            title.Text = "Pembayaran QRIS";
+            title.Font = new Font("Anek Devanagari", 18, FontStyle.Bold);
+            title.AutoSize = true;
+            title.Location = new Point(110, 25);
+            qrForm.Controls.Add(title);
+
+            Panel qrBox = RoundedPanel(250, 250, 15, Color.FromArgb(245, 245, 245));
+            qrBox.Location = new Point(82, 85);
+            qrForm.Controls.Add(qrBox);
+
+            Label qr = new Label();
+            qr.Text = "QRIS";
+            qr.Font = new Font("Anek Devanagari", 42, FontStyle.Bold);
+            qr.ForeColor = Color.Black;
+            qr.AutoSize = false;
+            qr.TextAlign = ContentAlignment.MiddleCenter;
+            qr.Dock = DockStyle.Fill;
+            qrBox.Controls.Add(qr);
+
+            Label detail = new Label();
+            detail.Text =
+                "Nama: " + nama +
+                "\nStudio: " + studio +
+                "\nTanggal: " + tanggal.ToString("dd/MM/yyyy") +
+                "\nWaktu: " + waktu +
+                "\nTotal: " + FormatRupiah(total) +
+                "\n\nScan QR ini untuk melakukan pembayaran.";
+            detail.Font = new Font("Anek Devanagari", 10);
+            detail.AutoSize = false;
+            detail.Size = new Size(350, 130);
+            detail.Location = new Point(35, 355);
+            qrForm.Controls.Add(detail);
+
+            Button ok = new Button();
+            ok.Text = "Selesai";
+            ok.Font = new Font("Anek Devanagari", 11, FontStyle.Bold);
+            ok.Size = new Size(330, 38);
+            ok.Location = new Point(42, 475);
+            ok.BackColor = Yellow;
+            ok.FlatStyle = FlatStyle.Flat;
+            ok.FlatAppearance.BorderSize = 0;
+            ok.Click += (s, e) => qrForm.Close();
+            qrForm.Controls.Add(ok);
+
+            qrForm.ShowDialog();
+        }
+
+        void SelectStudioCard(Panel card, int id, string name, int harga)
+        {
+            if (selectedStudioCard != null)
+                selectedStudioCard.BackColor = Color.White;
+
+            selectedStudioCard = card;
+            selectedStudioCard.BackColor = Color.FromArgb(232, 241, 255);
+
+            selectedStudioId = id;
+            selectedStudioName = name;
+            selectedHargaPerJam = harga;
+        }
+
+        Panel AddStudioCard(Control parent, int x, int y, int idStudio, string name, string type, int harga, Color dotColor, string emoji)
         {
             Panel card = RoundedPanel(188, 112, 8, Color.White);
             card.Location = new Point(x, y);
             card.Cursor = Cursors.Hand;
             parent.Controls.Add(card);
+
+            Color normalColor = Color.White;
+            Color hoverColor = Color.FromArgb(245, 249, 255);
+
+            card.MouseEnter += (s, e) =>
+            {
+                if (card != selectedStudioCard)
+                    card.BackColor = hoverColor;
+            };
+
+            card.MouseLeave += (s, e) =>
+            {
+                if (card != selectedStudioCard)
+                    card.BackColor = normalColor;
+            };
 
             card.Paint += (s, e) =>
             {
@@ -668,39 +901,45 @@ namespace Triosik
             dot.Size = new Size(16, 16);
             dot.Location = new Point(18, 18);
             dot.BackColor = dotColor;
-            dot.Region = new Region(new GraphicsPath());
             card.Controls.Add(dot);
 
-            dot.Paint += (s, e) =>
-            {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                using (Brush b = new SolidBrush(dotColor))
-                    e.Graphics.FillEllipse(b, 0, 0, 15, 15);
-            };
-
-            Label title = new Label();
-            title.Text = name;
-            title.Font = new Font("Anek Devanagari", 10, FontStyle.Bold);
-            title.AutoSize = true;
-            title.Location = new Point(42, 14);
-            card.Controls.Add(title);
-
-            Label sub = new Label();
-            sub.Text = type;
-            sub.Font = new Font("Anek Devanagari", 8);
-            sub.AutoSize = true;
-            sub.Location = new Point(42, 36);
-            card.Controls.Add(sub);
+            Label title = AddLabel(card, name, 42, 14, 10, true, Color.Black);
+            Label sub = AddLabel(card, type + "\n" + FormatRupiah(harga) + "/jam", 42, 36, 8, false, Color.Black);
 
             Label icon = new Label();
             icon.Text = emoji;
-            icon.Font = new Font("Segoe UI Emoji", 30);
+            icon.Font = new Font("Segoe UI Emoji", 28);
             icon.ForeColor = dotColor;
             icon.AutoSize = true;
-            icon.Location = new Point(125, 54);
+            icon.Location = new Point(125, 58);
+            icon.Cursor = Cursors.Hand;
             card.Controls.Add(icon);
 
+            title.Cursor = Cursors.Hand;
+            sub.Cursor = Cursors.Hand;
+
+            title.Click += (s, e) => TriggerPanelClick(card);
+            sub.Click += (s, e) => TriggerPanelClick(card);
+            icon.Click += (s, e) => TriggerPanelClick(card);
+
+            void TriggerPanelClick(Panel panel)
+            {
+                panel.GetType()
+                    .GetMethod("OnClick", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .Invoke(panel, new object[] { EventArgs.Empty });
+            }
+
             return card;
+        }
+
+        void AddBookingSectionTitle(Control parent, Image icon, string text, int y)
+        {
+            if (icon != null)
+                AddPic(parent, RecolorIcon(icon, Blue), 28, y, 24, 24);
+            else
+                AddLabel(parent, "+", 30, y - 5, 18, true, Blue);
+
+            AddLabel(parent, text, 62, y + 3, 10, false, Color.Black);
         }
 
         CheckBox AddServiceBox(Control parent, int x, int y, string title, string price)
@@ -726,23 +965,41 @@ namespace Triosik
             return cb;
         }
 
-        void AddSummaryRow(Control parent, Image icon, string title, string value, int y)
+        Label AddSummaryRow(Control parent, Image icon, string title, string value, int y)
         {
             AddPic(parent, RecolorIcon(icon, Blue), 22, y, 20, 20);
+            AddLabel(parent, title, 50, y, 9, false, Color.Black);
 
+            Label val = AddLabel(parent, value, 205, y, 9, true, Color.Black);
+            return val;
+        }
+
+        void AddSmallLabel(Control parent, string text, int x, int y)
+        {
+            AddLabel(parent, text, x, y, 9, false, Color.Black);
+        }
+
+        void AddLegend(Control parent, Color color, string text, int x)
+        {
+            Panel dot = new Panel();
+            dot.Size = new Size(13, 13);
+            dot.Location = new Point(x, 61);
+            dot.BackColor = color;
+            parent.Controls.Add(dot);
+
+            AddLabel(parent, text, x + 20, 55, 9, false, Color.Black);
+        }
+
+        Label AddLabel(Control parent, string text, int x, int y, int size, bool bold, Color color, string fontName = "Anek Devanagari")
+        {
             Label lbl = new Label();
-            lbl.Text = title;
-            lbl.Font = new Font("Anek Devanagari", 9);
+            lbl.Text = text;
+            lbl.Font = new Font(fontName, size, bold ? FontStyle.Bold : FontStyle.Regular);
+            lbl.ForeColor = color;
             lbl.AutoSize = true;
-            lbl.Location = new Point(50, y);
+            lbl.Location = new Point(x, y);
             parent.Controls.Add(lbl);
-
-            Label val = new Label();
-            val.Text = value;
-            val.Font = new Font("Anek Devanagari", 9, FontStyle.Bold);
-            val.AutoSize = true;
-            val.Location = new Point(250, y);
-            parent.Controls.Add(val);
+            return lbl;
         }
 
         void AddLine(Control parent, int x, int y, int w)
@@ -754,75 +1011,9 @@ namespace Triosik
             parent.Controls.Add(line);
         }
 
-        void Logout()
-        {
-            this.Close();
-            Form1 login = new Form1();
-            login.Show();
-        }
-
-        void AddLegend(Control parent, Color color, string text, int x)
-        {
-            Panel dot = new Panel();
-            dot.Size = new Size(13, 13);
-            dot.Location = new Point(x, 61);
-            dot.BackColor = color;
-            parent.Controls.Add(dot);
-
-            Label lbl = new Label();
-            lbl.Text = text;
-            lbl.Font = new Font("Anek Devanagari", 9);
-            lbl.AutoSize = true;
-            lbl.Location = new Point(x + 20, 55);
-            parent.Controls.Add(lbl);
-        }
-
-        void AddScheduleHeader(Panel table)
-        {
-            AddText(table, "Waktu", 55, 30, 11, true);
-            AddStudioHeader(table, Color.FromArgb(120, 200, 145), "Studio 1", "(Regular)", 270);
-            AddStudioHeader(table, Color.FromArgb(255, 225, 120), "Studio 2", "(Vip)", 580);
-            AddStudioHeader(table, Color.FromArgb(255, 120, 90), "Studio Utama", "(Vvip)", 900);
-        }
-
-        void AddStudioHeader(Panel table, Color color, string name, string type, int x)
-        {
-            Panel dot = new Panel();
-            dot.Size = new Size(13, 13);
-            dot.Location = new Point(x, 30);
-            dot.BackColor = color;
-            table.Controls.Add(dot);
-
-            AddText(table, name, x + 20, 23, 10, true);
-            AddText(table, type, x + 20, 42, 8, false);
-        }
-
-        void AddScheduleTimeRows(Panel table)
-        {
-            string[] times =
-            {
-                "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00",
-                "12:00 - 13:00", "13:00 - 14:00", "14:00 - 15:00",
-                "15:00 - 16:00", "16:00 - 17:00", "17:00 - 18:00",
-                "18:00 - 19:00", "19:00 - 20:00", "20:00 - 21:00"
-            };
-
-            int y = 80;
-            foreach (string time in times)
-            {
-                AddText(table, time, 55, y, 11, false);
-                y += 34;
-            }
-        }
-
         void AddText(Control parent, string text, int x, int y, int size, bool bold)
         {
-            Label lbl = new Label();
-            lbl.Text = text;
-            lbl.Font = new Font("Anek Devanagari", size, bold ? FontStyle.Bold : FontStyle.Regular);
-            lbl.AutoSize = true;
-            lbl.Location = new Point(x, y);
-            parent.Controls.Add(lbl);
+            AddLabel(parent, text, x, y, size, bold, Color.Black);
         }
 
         void AddPic(Control parent, Image img, int x, int y, int w, int h)
@@ -835,6 +1026,31 @@ namespace Triosik
             pic.BackColor = Color.Transparent;
             parent.Controls.Add(pic);
             pic.BringToFront();
+        }
+
+        string FormatRupiah(int value)
+        {
+            return "Rp " + value.ToString("N0").Replace(",", ".");
+        }
+
+        Image RecolorIcon(Image original, Color color)
+        {
+            Bitmap bmp = new Bitmap(original.Width, original.Height);
+
+            using (Graphics g = Graphics.FromImage(bmp))
+                g.DrawImage(original, 0, 0, original.Width, original.Height);
+
+            for (int y = 0; y < bmp.Height; y++)
+            {
+                for (int x = 0; x < bmp.Width; x++)
+                {
+                    Color px = bmp.GetPixel(x, y);
+                    if (px.A > 20)
+                        bmp.SetPixel(x, y, Color.FromArgb(px.A, color.R, color.G, color.B));
+                }
+            }
+
+            return bmp;
         }
 
         Panel RoundedPanel(int w, int h, int r, Color color)
@@ -852,6 +1068,160 @@ namespace Triosik
 
             p.Region = new Region(path);
             return p;
+        }
+
+        void Logout()
+        {
+            this.Close();
+            Form1 login = new Form1();
+            login.Show();
+        }
+
+        void AnimateClick(Control control)
+        {
+            int originalW = control.Width;
+            int originalH = control.Height;
+            int originalX = control.Left;
+            int originalY = control.Top;
+
+            control.Width -= 4;
+            control.Height -= 4;
+            control.Left += 2;
+            control.Top += 2;
+
+            Timer timer = new Timer();
+            timer.Interval = 80;
+            timer.Tick += (s, e) =>
+            {
+                timer.Stop();
+                timer.Dispose();
+
+                control.Width = originalW;
+                control.Height = originalH;
+                control.Left = originalX;
+                control.Top = originalY;
+            };
+
+            timer.Start();
+        }
+
+        void ShowCustomNotif(string title, string message, Color accentColor)
+        {
+            Form notif = new Form();
+            notif.FormBorderStyle = FormBorderStyle.None;
+            notif.StartPosition = FormStartPosition.CenterScreen;
+            notif.Size = new Size(420, 220);
+            notif.BackColor = Color.White;
+            notif.TopMost = true;
+
+            Panel accent = new Panel();
+            accent.BackColor = accentColor;
+            accent.Dock = DockStyle.Top;
+            accent.Height = 8;
+            notif.Controls.Add(accent);
+
+            Label lblTitle = new Label();
+            lblTitle.Text = title;
+            lblTitle.Font = new Font("Anek Devanagari", 18, FontStyle.Bold);
+            lblTitle.ForeColor = Color.Black;
+            lblTitle.AutoSize = false;
+            lblTitle.TextAlign = ContentAlignment.MiddleCenter;
+            lblTitle.Location = new Point(20, 35);
+            lblTitle.Size = new Size(380, 40);
+            notif.Controls.Add(lblTitle);
+
+            Label lblMsg = new Label();
+            lblMsg.Text = message;
+            lblMsg.Font = new Font("Anek Devanagari", 10);
+            lblMsg.ForeColor = Color.Black;
+            lblMsg.AutoSize = false;
+            lblMsg.TextAlign = ContentAlignment.MiddleCenter;
+            lblMsg.Location = new Point(35, 85);
+            lblMsg.Size = new Size(350, 60);
+            notif.Controls.Add(lblMsg);
+
+            Button ok = new Button();
+            ok.Text = "Oke";
+            ok.Font = new Font("Anek Devanagari", 10, FontStyle.Bold);
+            ok.Size = new Size(150, 38);
+            ok.Location = new Point(135, 160);
+            ok.BackColor = Yellow;
+            ok.FlatStyle = FlatStyle.Flat;
+            ok.FlatAppearance.BorderSize = 0;
+            ok.Cursor = Cursors.Hand;
+            ok.Click += (s, e) => notif.Close();
+            notif.Controls.Add(ok);
+
+            notif.ShowDialog();
+        }
+
+        bool ShowConfirmNotif(string title, string message)
+        {
+            bool result = false;
+
+            Form notif = new Form();
+            notif.FormBorderStyle = FormBorderStyle.None;
+            notif.StartPosition = FormStartPosition.CenterScreen;
+            notif.Size = new Size(460, 250);
+            notif.BackColor = Color.White;
+            notif.TopMost = true;
+
+            Panel accent = new Panel();
+            accent.BackColor = Yellow;
+            accent.Dock = DockStyle.Top;
+            accent.Height = 8;
+            notif.Controls.Add(accent);
+
+            Label lblTitle = new Label();
+            lblTitle.Text = title;
+            lblTitle.Font = new Font("Anek Devanagari", 18, FontStyle.Bold);
+            lblTitle.AutoSize = false;
+            lblTitle.TextAlign = ContentAlignment.MiddleCenter;
+            lblTitle.Location = new Point(20, 35);
+            lblTitle.Size = new Size(420, 40);
+            notif.Controls.Add(lblTitle);
+
+            Label lblMsg = new Label();
+            lblMsg.Text = message;
+            lblMsg.Font = new Font("Anek Devanagari", 10);
+            lblMsg.AutoSize = false;
+            lblMsg.TextAlign = ContentAlignment.MiddleCenter;
+            lblMsg.Location = new Point(40, 85);
+            lblMsg.Size = new Size(380, 80);
+            notif.Controls.Add(lblMsg);
+
+            Button batal = new Button();
+            batal.Text = "Batal";
+            batal.Font = new Font("Anek Devanagari", 10, FontStyle.Bold);
+            batal.Size = new Size(130, 38);
+            batal.Location = new Point(85, 180);
+            batal.BackColor = Color.FromArgb(230, 230, 230);
+            batal.FlatStyle = FlatStyle.Flat;
+            batal.FlatAppearance.BorderSize = 0;
+            batal.Click += (s, e) =>
+            {
+                result = false;
+                notif.Close();
+            };
+            notif.Controls.Add(batal);
+
+            Button yakin = new Button();
+            yakin.Text = "Yakin";
+            yakin.Font = new Font("Anek Devanagari", 10, FontStyle.Bold);
+            yakin.Size = new Size(130, 38);
+            yakin.Location = new Point(245, 180);
+            yakin.BackColor = Yellow;
+            yakin.FlatStyle = FlatStyle.Flat;
+            yakin.FlatAppearance.BorderSize = 0;
+            yakin.Click += (s, e) =>
+            {
+                result = true;
+                notif.Close();
+            };
+            notif.Controls.Add(yakin);
+
+            notif.ShowDialog();
+            return result;
         }
     }
 }
