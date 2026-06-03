@@ -265,7 +265,7 @@ namespace Triosik
 
             e.Graphics.DrawImage(Properties.Resources.Kuning, new Rectangle(30, 105, 340, 300));
             e.Graphics.DrawImage(Properties.Resources.Pink, new Rectangle(330, 240, 310, 250));
-            e.Graphics.DrawImage(Properties.Resources.Hitam, new Rectangle(80, h - 315, 330, 260));
+            e.Graphics.DrawImage(Properties.Resources.Hitam, new Rectangle(80, 480, 330, 260));
         }
     }
 }
