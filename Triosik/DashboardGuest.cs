@@ -11,6 +11,10 @@ namespace Triosik
         Panel sidebar, contentPanel, wrapperPanel;
         string activeMenu = "Dashboard";
 
+        const int DesignWidth = 1200;
+        const int DesignHeight = 820;
+        Timer pageAnimTimer;
+
         readonly Color Blue = Color.FromArgb(31, 126, 224);
         readonly Color Yellow = Color.FromArgb(255, 230, 55);
         readonly Color Green = Color.FromArgb(120, 200, 145);
@@ -49,25 +53,16 @@ namespace Triosik
             contentPanel = new Panel();
             contentPanel.Dock = DockStyle.Fill;
             contentPanel.BackColor = Color.FromArgb(200, 224, 249);
+            contentPanel.AutoScroll = true;
             this.Controls.Add(contentPanel);
 
             wrapperPanel = new Panel();
-            wrapperPanel.Size = new Size(1280, 820);
+            wrapperPanel.Size = new Size(DesignWidth, DesignHeight);
             wrapperPanel.BackColor = Color.Transparent;
             contentPanel.Controls.Add(wrapperPanel);
 
-            contentPanel.Resize += (s, e) =>
-            {
-                wrapperPanel.Location = new Point(
-                    Math.Max(190, (contentPanel.Width - wrapperPanel.Width) / 2 + 180),
-                    Math.Max(15, (contentPanel.Height - wrapperPanel.Height) / 2)
-                );
-            };
-
-            wrapperPanel.Location = new Point(
-                Math.Max(190, (contentPanel.Width - wrapperPanel.Width) / 2 + 180),
-                Math.Max(15, (contentPanel.Height - wrapperPanel.Height) / 2)
-            );
+            contentPanel.Resize += (s, e) => CenterWrapper();
+            CenterWrapper();
 
             SetActiveMenu("Dashboard");
             ShowDashboardPage();
@@ -124,6 +119,16 @@ namespace Triosik
             lbl.Cursor = Cursors.Hand;
             menu.Controls.Add(lbl);
 
+            menu.MouseEnter += (s, e) =>
+            {
+                if (!active) menu.BackColor = Color.FromArgb(22, 112, 210);
+            };
+
+            menu.MouseLeave += (s, e) =>
+            {
+                if (!active) menu.BackColor = Blue;
+            };
+
             menu.Click += (s, e) =>
             {
                 SetActiveMenu(text);
@@ -165,6 +170,8 @@ namespace Triosik
             AddSchedulePanel();
             AddWhyPanel();
             AddBookingPanel();
+
+            StartPageAnimation();
         }
 
         void AddTopCard(int x, int y, Color bg, Image icon, string big, string title, string desc)
@@ -299,8 +306,8 @@ namespace Triosik
             filterBox.Controls.Add(cmbStudio);
 
             AddLegend(filterBox, Green, "Tersedia", 650);
-            AddLegend(filterBox, Red, "Dibooking", 760);
-            AddLegend(filterBox, Gray, "Tidak Tersedia", 870);
+            AddLegend(filterBox, Yellow, "Dibooking", 760);
+            AddLegend(filterBox, Red, "Tidak Tersedia", 870);
 
             Button cari = new Button();
             cari.Text = "Cari";
@@ -324,6 +331,8 @@ namespace Triosik
 
             cari.Click += (s, e) => load();
             load();
+
+            StartPageAnimation();
         }
 
         void AddScheduleHeader(Panel table)
@@ -398,7 +407,35 @@ namespace Triosik
                     if (statusObj == null || statusObj.ToString() != "Aktif")
                         return "Tidak Tersedia";
 
-                    string query = @"
+                    string confirmedQuery = @"
+                    SELECT COUNT(*)
+                    FROM dbo.Booking
+                    WHERE id_studio = @id_studio
+                    AND tanggal = @tanggal
+                    AND status_booking <> 'Dibatalkan'
+                    AND (
+                        @mulai < jam_selesai
+                        AND @selesai > jam_mulai
+                    )
+                    AND (
+                        status_pembayaran = 'Lunas'
+                        OR status_booking = 'Dikonfirmasi'
+                        OR status_booking = 'Lunas'
+                        OR status_booking = 'Selesai'
+                    )";
+
+                    SqlCommand confirmedCmd = new SqlCommand(confirmedQuery, conn);
+                    confirmedCmd.Parameters.AddWithValue("@id_studio", idStudio);
+                    confirmedCmd.Parameters.AddWithValue("@tanggal", tanggal.Date);
+                    confirmedCmd.Parameters.AddWithValue("@mulai", mulai);
+                    confirmedCmd.Parameters.AddWithValue("@selesai", selesai);
+
+                    int confirmedCount = (int)confirmedCmd.ExecuteScalar();
+
+                    if (confirmedCount > 0)
+                        return "Tidak Tersedia";
+
+                    string holdQuery = @"
                     SELECT COUNT(*)
                     FROM dbo.Booking
                     WHERE id_studio = @id_studio
@@ -409,15 +446,15 @@ namespace Triosik
                         AND @selesai > jam_mulai
                     )";
 
-                    SqlCommand cmd = new SqlCommand(query, conn);
-                    cmd.Parameters.AddWithValue("@id_studio", idStudio);
-                    cmd.Parameters.AddWithValue("@tanggal", tanggal.Date);
-                    cmd.Parameters.AddWithValue("@mulai", mulai);
-                    cmd.Parameters.AddWithValue("@selesai", selesai);
+                    SqlCommand holdCmd = new SqlCommand(holdQuery, conn);
+                    holdCmd.Parameters.AddWithValue("@id_studio", idStudio);
+                    holdCmd.Parameters.AddWithValue("@tanggal", tanggal.Date);
+                    holdCmd.Parameters.AddWithValue("@mulai", mulai);
+                    holdCmd.Parameters.AddWithValue("@selesai", selesai);
 
-                    int count = (int)cmd.ExecuteScalar();
+                    int holdCount = (int)holdCmd.ExecuteScalar();
 
-                    return count > 0 ? "Dibooking" : "Tersedia";
+                    return holdCount > 0 ? "Dibooking" : "Tersedia";
                 }
             }
             catch
@@ -431,11 +468,16 @@ namespace Triosik
             Color bg = Green;
             Color fg = Color.White;
 
-            if (status == "Dibooking") bg = Red;
+            if (status == "Dibooking")
+            {
+                bg = Yellow;
+                fg = Color.Black;
+            }
+
             if (status == "Tidak Tersedia")
             {
-                bg = Gray;
-                fg = Color.Black;
+                bg = Red;
+                fg = Color.White;
             }
 
             Panel card = RoundedPanel(145, 27, 9, bg);
@@ -575,15 +617,11 @@ namespace Triosik
 
             AddLabel(rightBox, "Metode Pembayaran", 28, 445, 11, true, Color.Black);
 
-            ComboBox cmbBayar = new ComboBox();
-            cmbBayar.Location = new Point(28, 475);
-            cmbBayar.Size = new Size(180, 54);
-            cmbBayar.Font = new Font("Anek Devanagari", 10);
-            cmbBayar.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbBayar.Items.Add("Cash");
-            cmbBayar.Items.Add("QRIS");
-            cmbBayar.SelectedIndex = 0;
-            rightBox.Controls.Add(cmbBayar);
+            Panel cashBox = RoundedPanel(180, 38, 10, Color.FromArgb(255, 249, 231));
+            cashBox.Location = new Point(28, 475);
+            rightBox.Controls.Add(cashBox);
+
+            AddLabel(cashBox, "Cash / Bayar di Kasir", 18, 9, 9, true, Color.Black);
 
             Button btnBooking = new Button();
             btnBooking.Text = "Bayar";
@@ -601,7 +639,7 @@ namespace Triosik
             infoBox.Location = new Point(20, 585);
             rightBox.Controls.Add(infoBox);
 
-            AddLabel(infoBox, "✦ Silahkan Isi Form Booking Dengan Lengkap.", 18, 13, 9, true, Color.Black);
+            AddLabel(infoBox, "✦ Setelah bayar, status masuk Dibooking sampai kasir konfirmasi.", 18, 13, 8, true, Color.Black);
 
             Action updateSummary = () =>
             {
@@ -658,7 +696,7 @@ namespace Triosik
             {
                 if (txtNama.Text.Trim() == "" || txtNoHp.Text.Trim() == "")
                 {
-                    MessageBox.Show("Nama pemesan dan No HP wajib diisi.");
+                    ShowCustomNotif("Data Belum Lengkap", "Nama pemesan dan No HP wajib diisi.", Red);
                     return;
                 }
 
@@ -667,23 +705,23 @@ namespace Triosik
 
                 if (jamSelesai <= jamMulai)
                 {
-                    MessageBox.Show("Jam selesai harus lebih besar dari jam mulai.");
+                    ShowCustomNotif("Jam Tidak Valid", "Jam selesai harus lebih besar dari jam mulai.", Red);
                     return;
                 }
 
                 int durasi = (int)(jamSelesai - jamMulai).TotalHours;
                 int totalHarga = HitungTotal(jamMulai, jamSelesai, alat.Checked, rekam.Checked, mixing.Checked);
-
-                string metode = cmbBayar.Text;
+                string metode = "Cash";
 
                 bool yakin = ShowConfirmNotif(
-    "Konfirmasi Booking",
-    "Studio: " + selectedStudioName +
-    "\nTanggal: " + tanggal.Value.ToString("dd/MM/yyyy") +
-    "\nJam: " + cmbDari.Text + " - " + cmbSampai.Text +
-    "\nTotal: " + FormatRupiah(totalHarga) +
-    "\nMetode: " + metode
-);
+                    "Konfirmasi Booking",
+                    "Studio: " + selectedStudioName +
+                    "\nTanggal: " + tanggal.Value.ToString("dd/MM/yyyy") +
+                    "\nJam: " + cmbDari.Text + " - " + cmbSampai.Text +
+                    "\nTotal: " + FormatRupiah(totalHarga) +
+                    "\nMetode: Cash / Bayar di Kasir" +
+                    "\n\nSetelah ini formulir akan ditahan dengan status Dibooking."
+                );
 
                 if (!yakin)
                     return;
@@ -702,12 +740,17 @@ namespace Triosik
 
                 if (sukses)
                 {
-                    if (metode == "QRIS")
-                        ShowQRISBill(txtNama.Text.Trim(), selectedStudioName, tanggal.Value.Date, cmbDari.Text + " - " + cmbSampai.Text, totalHarga);
-                    else
-                        ShowCashBill(txtNama.Text.Trim(), selectedStudioName, tanggal.Value.Date, cmbDari.Text + " - " + cmbSampai.Text, totalHarga);
+                    ShowCashBill(
+                        txtNama.Text.Trim(),
+                        selectedStudioName,
+                        tanggal.Value.Date,
+                        cmbDari.Text + " - " + cmbSampai.Text,
+                        totalHarga
+                    );
                 }
             };
+
+            StartPageAnimation();
         }
 
         int HitungTotal(TimeSpan mulai, TimeSpan selesai, bool alat, bool rekam, bool mixing)
@@ -752,15 +795,15 @@ namespace Triosik
 
                     if (bentrok > 0)
                     {
-                        MessageBox.Show("Jadwal sudah dibooking. Pilih jam lain.");
+                        ShowCustomNotif("Jadwal Bentrok", "Jadwal sudah dibooking. Pilih jam lain.", Red);
                         return false;
                     }
 
                     string insertQuery = @"
                     INSERT INTO dbo.Booking
-                    (nama_pemesan, no_hp, id_studio, tanggal, jam_mulai, jam_selesai, durasi, total_harga, metode_pembayaran)
+                    (nama_pemesan, no_hp, id_studio, tanggal, jam_mulai, jam_selesai, durasi, total_harga, status_booking, status_pembayaran, metode_pembayaran)
                     VALUES
-                    (@nama, @no_hp, @id_studio, @tanggal, @jam_mulai, @jam_selesai, @durasi, @total_harga, @metode_pembayaran)";
+                    (@nama, @no_hp, @id_studio, @tanggal, @jam_mulai, @jam_selesai, @durasi, @total_harga, @status_booking, @status_pembayaran, @metode_pembayaran)";
 
                     SqlCommand cmd = new SqlCommand(insertQuery, conn);
                     cmd.Parameters.AddWithValue("@nama", nama);
@@ -771,6 +814,8 @@ namespace Triosik
                     cmd.Parameters.AddWithValue("@jam_selesai", jamSelesai);
                     cmd.Parameters.AddWithValue("@durasi", durasi);
                     cmd.Parameters.AddWithValue("@total_harga", totalHarga);
+                    cmd.Parameters.AddWithValue("@status_booking", "Menunggu");
+                    cmd.Parameters.AddWithValue("@status_pembayaran", "Belum Lunas");
                     cmd.Parameters.AddWithValue("@metode_pembayaran", metode);
 
                     cmd.ExecuteNonQuery();
@@ -779,81 +824,23 @@ namespace Triosik
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Gagal menyimpan booking:\n" + ex.Message);
+                ShowCustomNotif("Gagal Menyimpan", "Gagal menyimpan booking:\n" + ex.Message, Red);
                 return false;
             }
         }
 
         void ShowCashBill(string nama, string studio, DateTime tanggal, string waktu, int total)
         {
-            MessageBox.Show(
-                "BOOKING BERHASIL\n\n" +
+            ShowCustomNotif(
+                "Form Booking Ditahan",
                 "Nama: " + nama +
                 "\nStudio: " + studio +
                 "\nTanggal: " + tanggal.ToString("dd/MM/yyyy") +
                 "\nWaktu: " + waktu +
                 "\nTotal: " + FormatRupiah(total) +
-                "\n\nSilakan bayar ke kasir studio.",
-                "Bill Cash",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information
+                "\n\nStatus sekarang: Dibooking. Silakan bayar ke kasir.",
+                Yellow
             );
-        }
-
-        void ShowQRISBill(string nama, string studio, DateTime tanggal, string waktu, int total)
-        {
-            Form qrForm = new Form();
-            qrForm.Text = "Pembayaran QRIS";
-            qrForm.Size = new Size(420, 560);
-            qrForm.StartPosition = FormStartPosition.CenterScreen;
-            qrForm.BackColor = Color.White;
-
-            Label title = new Label();
-            title.Text = "Pembayaran QRIS";
-            title.Font = new Font("Anek Devanagari", 18, FontStyle.Bold);
-            title.AutoSize = true;
-            title.Location = new Point(110, 25);
-            qrForm.Controls.Add(title);
-
-            Panel qrBox = RoundedPanel(250, 250, 15, Color.FromArgb(245, 245, 245));
-            qrBox.Location = new Point(82, 85);
-            qrForm.Controls.Add(qrBox);
-
-            Label qr = new Label();
-            qr.Text = "QRIS";
-            qr.Font = new Font("Anek Devanagari", 42, FontStyle.Bold);
-            qr.ForeColor = Color.Black;
-            qr.AutoSize = false;
-            qr.TextAlign = ContentAlignment.MiddleCenter;
-            qr.Dock = DockStyle.Fill;
-            qrBox.Controls.Add(qr);
-
-            Label detail = new Label();
-            detail.Text =
-                "Nama: " + nama +
-                "\nStudio: " + studio +
-                "\nTanggal: " + tanggal.ToString("dd/MM/yyyy") +
-                "\nWaktu: " + waktu +
-                "\nTotal: " + FormatRupiah(total) +
-                "\n\nScan QR ini untuk melakukan pembayaran.";
-            detail.Font = new Font("Anek Devanagari", 10);
-            detail.AutoSize = false;
-            detail.Size = new Size(350, 130);
-            detail.Location = new Point(35, 355);
-            qrForm.Controls.Add(detail);
-
-            Button ok = new Button();
-            ok.Text = "Selesai";
-            ok.Font = new Font("Anek Devanagari", 11, FontStyle.Bold);
-            ok.Size = new Size(330, 38);
-            ok.Location = new Point(42, 475);
-            ok.BackColor = Yellow;
-            ok.FlatStyle = FlatStyle.Flat;
-            ok.FlatAppearance.BorderSize = 0;
-            ok.Click += (s, e) => qrForm.Close();
-            qrForm.Controls.Add(ok);
-
-            qrForm.ShowDialog();
         }
 
         void SelectStudioCard(Panel card, int id, string name, int harga)
@@ -1070,6 +1057,66 @@ namespace Triosik
             return p;
         }
 
+        void CenterWrapper()
+        {
+            if (contentPanel == null || wrapperPanel == null) return;
+
+            int availableW = contentPanel.ClientSize.Width;
+            int availableH = contentPanel.ClientSize.Height;
+
+            int x = Math.Max(25, (availableW - wrapperPanel.Width) / 2);
+            int y = Math.Max(10, (availableH - wrapperPanel.Height) / 2);
+
+            wrapperPanel.Location = new Point(x, y);
+        }
+
+        void StartPageAnimation()
+        {
+            if (wrapperPanel == null) return;
+
+            if (pageAnimTimer != null)
+            {
+                pageAnimTimer.Stop();
+                pageAnimTimer.Dispose();
+            }
+
+            CenterWrapper();
+
+            int targetX = wrapperPanel.Left;
+            int targetY = wrapperPanel.Top;
+            wrapperPanel.Left = targetX + 28;
+
+            foreach (Control c in wrapperPanel.Controls)
+                c.Visible = false;
+
+            int step = 0;
+            pageAnimTimer = new Timer();
+            pageAnimTimer.Interval = 12;
+            pageAnimTimer.Tick += (s, e) =>
+            {
+                step++;
+
+                if (step == 1)
+                {
+                    foreach (Control c in wrapperPanel.Controls)
+                        c.Visible = true;
+                }
+
+                wrapperPanel.Left = Math.Max(targetX, wrapperPanel.Left - 4);
+
+                if (wrapperPanel.Left <= targetX)
+                {
+                    wrapperPanel.Left = targetX;
+                    wrapperPanel.Top = targetY;
+                    pageAnimTimer.Stop();
+                    pageAnimTimer.Dispose();
+                    pageAnimTimer = null;
+                }
+            };
+
+            pageAnimTimer.Start();
+        }
+
         void Logout()
         {
             this.Close();
@@ -1110,7 +1157,7 @@ namespace Triosik
             Form notif = new Form();
             notif.FormBorderStyle = FormBorderStyle.None;
             notif.StartPosition = FormStartPosition.CenterScreen;
-            notif.Size = new Size(420, 220);
+            notif.Size = new Size(420, 240);
             notif.BackColor = Color.White;
             notif.TopMost = true;
 
@@ -1137,14 +1184,14 @@ namespace Triosik
             lblMsg.AutoSize = false;
             lblMsg.TextAlign = ContentAlignment.MiddleCenter;
             lblMsg.Location = new Point(35, 85);
-            lblMsg.Size = new Size(350, 60);
+            lblMsg.Size = new Size(350, 85);
             notif.Controls.Add(lblMsg);
 
             Button ok = new Button();
             ok.Text = "Oke";
             ok.Font = new Font("Anek Devanagari", 10, FontStyle.Bold);
             ok.Size = new Size(150, 38);
-            ok.Location = new Point(135, 160);
+            ok.Location = new Point(135, 180);
             ok.BackColor = Yellow;
             ok.FlatStyle = FlatStyle.Flat;
             ok.FlatAppearance.BorderSize = 0;
@@ -1162,7 +1209,7 @@ namespace Triosik
             Form notif = new Form();
             notif.FormBorderStyle = FormBorderStyle.None;
             notif.StartPosition = FormStartPosition.CenterScreen;
-            notif.Size = new Size(460, 250);
+            notif.Size = new Size(460, 280);
             notif.BackColor = Color.White;
             notif.TopMost = true;
 
@@ -1187,14 +1234,14 @@ namespace Triosik
             lblMsg.AutoSize = false;
             lblMsg.TextAlign = ContentAlignment.MiddleCenter;
             lblMsg.Location = new Point(40, 85);
-            lblMsg.Size = new Size(380, 80);
+            lblMsg.Size = new Size(380, 110);
             notif.Controls.Add(lblMsg);
 
             Button batal = new Button();
             batal.Text = "Batal";
             batal.Font = new Font("Anek Devanagari", 10, FontStyle.Bold);
             batal.Size = new Size(130, 38);
-            batal.Location = new Point(85, 180);
+            batal.Location = new Point(85, 215);
             batal.BackColor = Color.FromArgb(230, 230, 230);
             batal.FlatStyle = FlatStyle.Flat;
             batal.FlatAppearance.BorderSize = 0;
@@ -1209,7 +1256,7 @@ namespace Triosik
             yakin.Text = "Yakin";
             yakin.Font = new Font("Anek Devanagari", 10, FontStyle.Bold);
             yakin.Size = new Size(130, 38);
-            yakin.Location = new Point(245, 180);
+            yakin.Location = new Point(245, 215);
             yakin.BackColor = Yellow;
             yakin.FlatStyle = FlatStyle.Flat;
             yakin.FlatAppearance.BorderSize = 0;
