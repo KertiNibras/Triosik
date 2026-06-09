@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Data.SqlClient;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -7,9 +8,18 @@ namespace Triosik
 {
     public partial class DashboardAdmin : Form
     {
-        Panel sidebar;
-        Panel contentPanel;
+        Panel sidebar, contentPanel;
         string activeMenu = "Dashboard";
+
+        readonly Color Blue = Color.FromArgb(0, 92, 220);
+        readonly Color DarkBlue = Color.FromArgb(0, 48, 120);
+        readonly Color Bg = Color.FromArgb(245, 249, 255);
+        readonly Color Card = Color.White;
+        readonly Color TextDark = Color.FromArgb(15, 23, 42);
+
+        const int SidebarW = 250;
+
+        string connString = @"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Triosik;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=False;ApplicationIntent=ReadWrite;MultiSubnetFailover=False";
 
         public DashboardAdmin()
         {
@@ -21,701 +31,678 @@ namespace Triosik
 
         void BuildUI()
         {
-            this.Text = "Dashboard Admin";
-            this.FormBorderStyle = FormBorderStyle.None;
-            this.WindowState = FormWindowState.Maximized;
-            this.BackColor = Color.FromArgb(248, 251, 255);
-            this.DoubleBuffered = true;
+            Text = "Triosik Admin";
+            FormBorderStyle = FormBorderStyle.None;
+            WindowState = FormWindowState.Maximized;
+            BackColor = Bg;
+            DoubleBuffered = true;
+            Controls.Clear();
 
             sidebar = new Panel();
-            sidebar.Width = 280;
-            sidebar.Dock = DockStyle.Left;
-            sidebar.BackColor = Color.FromArgb(31, 126, 224);
-            this.Controls.Add(sidebar);
+            sidebar.Location = new Point(0, 0);
+            sidebar.Size = new Size(SidebarW, ClientSize.Height);
+            sidebar.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
+            sidebar.BackColor = Blue;
+            Controls.Add(sidebar);
 
             contentPanel = new Panel();
-            contentPanel.Dock = DockStyle.Fill;
-            contentPanel.BackColor = Color.FromArgb(248, 251, 255);
-            this.Controls.Add(contentPanel);
+            contentPanel.Location = new Point(SidebarW, 0);
+            contentPanel.Size = new Size(ClientSize.Width - SidebarW, ClientSize.Height);
+            contentPanel.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            contentPanel.BackColor = Bg;
+            Controls.Add(contentPanel);
+
+            Resize += (s, e) =>
+            {
+                sidebar.Height = ClientSize.Height;
+                contentPanel.Location = new Point(SidebarW, 0);
+                contentPanel.Size = new Size(ClientSize.Width - SidebarW, ClientSize.Height);
+            };
 
             SetActiveMenu("Dashboard");
-            ShowDashboardPage();
+            ShowDashboard();
         }
 
-        void SetActiveMenu(string menuName)
+        void SetActiveMenu(string menu)
         {
-            activeMenu = menuName;
+            activeMenu = menu;
             sidebar.Controls.Clear();
 
-            AddPic(sidebar, Properties.Resources.Hitam, 35, 55, 70, 70);
-            AddPic(sidebar, Properties.Resources.Kuning, 85, 40, 85, 85);
-            AddPic(sidebar, Properties.Resources.Pink, 155, 58, 70, 70);
+            AddLabel(sidebar, "♪", 35, 30, 34, true, Color.White);
+            AddLabel(sidebar, "TRIOSIK", 85, 35, 18, true, Color.White);
+            AddLabel(sidebar, "Admin Panel", 86, 65, 10, false, Color.White);
 
-            Label logo1 = new Label();
-            logo1.Text = "Triosic";
-            logo1.Font = new Font("Chubby And Groovy", 34, FontStyle.Bold);
-            logo1.ForeColor = Color.White;
-            logo1.AutoSize = true;
-            logo1.Location = new Point(58, 135);
-            sidebar.Controls.Add(logo1);
+            AddMenu("⌂", "Dashboard", 125, ShowDashboard);
+            AddMenu("▣", "Kelola Booking", 200, ShowBooking);
+            AddMenu("♫", "Kelola Studio", 275, ShowStudio);
+            AddMenu("+", "Kelola Layanan", 350, ShowLayanan);
+            AddMenu("▤", "Laporan Pembayaran", 425, ShowPembayaran);
 
-            Label logo2 = new Label();
-            logo2.Text = "music studio";
-            logo2.Font = new Font("Ground Castle DEMO", 24, FontStyle.Bold);
-            logo2.ForeColor = Color.White;
-            logo2.AutoSize = true;
-            logo2.Location = new Point(50, 185);
-            sidebar.Controls.Add(logo2);
-
-            AddMenu(Properties.Resources.HomeIcon, "Dashboard", 280, ShowDashboardPage);
-            AddMenu(Properties.Resources.Jadwalicon, "Kelola Studio", 345, ShowStudioPage);
-            AddMenu(Properties.Resources.mulaibookingicon, "Kelola Jadwal\nOperasional", 410, ShowJadwalOperasionalPage);
-            AddMenu(Properties.Resources.Logouticon, "Konfirmasi Booking", 490, ShowKonfirmasiPage);
-            AddMenu(Properties.Resources.Logouticon, "Laporan Pemesanan", 555, ShowLaporanPage);
-            AddMenu(Properties.Resources.Logouticon, "Logout", 620, Logout);
+            AddLine(sidebar, 25, 510, 200);
+            AddMenu("↪", "Logout", 550, Logout);
         }
 
-        void AddMenu(Image icon, string text, int y, Action action)
+        void AddMenu(string icon, string text, int y, Action action)
         {
-            bool active = activeMenu == text.Replace("\n", " ");
-
-            Panel menu = RoundedPanel(240, text.Contains("\n") ? 64 : 52, 14,
-                active ? Color.FromArgb(255, 230, 55) : Color.FromArgb(31, 126, 224));
-
-            menu.Location = new Point(20, y);
+            bool active = activeMenu == text;
+            Panel menu = RoundedPanel(215, 52, 12, active ? Color.FromArgb(60, 145, 255) : Blue);
+            menu.Location = new Point(17, y);
             menu.Cursor = Cursors.Hand;
             sidebar.Controls.Add(menu);
 
-            AddPic(menu, icon, 17, 15, 26, 26);
+            AddLabel(menu, icon, 24, 11, 19, true, Color.White);
+            AddLabel(menu, text, 68, 15, 10, true, Color.White);
 
-            Label lbl = new Label();
-            lbl.Text = text;
-            lbl.Font = new Font("Segoe UI", 11, FontStyle.Bold);
-            lbl.ForeColor = active ? Color.Black : Color.White;
-            lbl.AutoSize = true;
-            lbl.Location = new Point(60, text.Contains("\n") ? 9 : 15);
-            lbl.Cursor = Cursors.Hand;
-            menu.Controls.Add(lbl);
-
-            menu.Click += (s, e) =>
-            {
-                SetActiveMenu(text.Replace("\n", " "));
-                action();
-            };
-
-            lbl.Click += (s, e) =>
-            {
-                SetActiveMenu(text.Replace("\n", " "));
-                action();
-            };
+            menu.Click += (s, e) => { SetActiveMenu(text); action(); };
+            foreach (Control c in menu.Controls)
+                c.Click += (s, e) => { SetActiveMenu(text); action(); };
         }
 
-        void ShowDashboardPage()
+        void TopBar(string title, string subtitle)
         {
             contentPanel.Controls.Clear();
-
-            AddText(contentPanel, "Selamat datang, Admin! 👋", 50, 45, 24, true);
-            AddText(contentPanel, "Kelola studio Triosic Music Studio dengan mudah.", 52, 90, 11, false, Color.FromArgb(100, 116, 139));
-
-            AddPic(contentPanel, Properties.Resources.Hitam, 980, 42, 55, 55);
-            AddText(contentPanel, "Admin", 1045, 50, 11, true);
-            AddText(contentPanel, "Administrator", 1045, 75, 9, false, Color.FromArgb(100, 116, 139));
-            AddText(contentPanel, "⌄", 1145, 54, 15, true, Color.FromArgb(37, 99, 235));
-
-            AddStatCard(50, 145, Color.FromArgb(245, 249, 255), Properties.Resources.card1icon, "Total Studio", "3", "Studio Aktif");
-            AddStatCard(300, 145, Color.FromArgb(246, 255, 249), Properties.Resources.calendergreen, "Total Booking Masuk", "24", "Booking");
-            AddStatCard(550, 145, Color.FromArgb(255, 251, 242), Properties.Resources.card2icon, "Booking Menunggu", "5", "Menunggu Konfirmasi");
-            AddStatCard(800, 145, Color.FromArgb(252, 246, 255), Properties.Resources.card4icon, "Total Pendapatan", "Rp7.250.000", "Bulan Ini");
-
-            AddRecentBookingPanel();
-            AddQuickButtonPanel();
+            AddLabel(contentPanel, title, 30, 35, 24, true, TextDark);
+            AddLabel(contentPanel, subtitle, 32, 75, 10, false, Color.FromArgb(90, 103, 125));
+            AddLabel(contentPanel, "▣  " + DateTime.Now.ToString("dd MMMM yyyy"), 560, 35, 9, true, TextDark);
+            AddLabel(contentPanel, "●  Admin⌄", 770, 35, 9, true, TextDark);
         }
 
-        void AddStatCard(int x, int y, Color bg, Image icon, string title, string value, string desc)
+        void ShowDashboard()
         {
-            Panel card = RoundedPanel(230, 135, 16, bg);
+            TopBar("Welcome Admin! 👋", "Kelola studio musik dengan mudah.");
+
+            AddStatCard(30, 120, "▣", "Total Booking", CountDb("SELECT COUNT(*) FROM Booking").ToString(), "Semua Data", Color.FromArgb(235, 245, 255), Blue);
+            AddStatCard(290, 120, "✓", "Booking Selesai", CountDb("SELECT COUNT(*) FROM Booking WHERE status_booking='Selesai'").ToString(), "Selesai", Color.FromArgb(235, 255, 242), Color.Green);
+            AddStatCard(550, 120, "◷", "Booking Pending", CountDb("SELECT COUNT(*) FROM Booking WHERE status_pembayaran='Belum Lunas'").ToString(), "Menunggu Kasir", Color.FromArgb(255, 246, 225), Color.Orange);
+            AddStatCard(810, 120, "Rp", "Total Pendapatan", FormatRupiah(CountDb("SELECT ISNULL(SUM(jumlah_bayar),0) FROM Pembayaran")), "Semua", Color.FromArgb(245, 240, 255), Color.FromArgb(90, 70, 220));
+
+            Panel quick = RoundedPanel(1020, 330, 18, Card);
+            quick.Location = new Point(30, 285);
+            contentPanel.Controls.Add(quick);
+
+            AddLabel(quick, "Akses Cepat", 30, 25, 15, true, TextDark);
+            AddQuickCard(quick, 35, 85, "▣", "Kelola Booking", "Lihat booking dan hapus data.", ShowBooking);
+            AddQuickCard(quick, 285, 85, "♫", "Kelola Studio", "Tambah, ubah, hapus studio.", ShowStudio);
+            AddQuickCard(quick, 535, 85, "+", "Kelola Layanan", "Tambah dan kelola layanan.", ShowLayanan);
+            AddQuickCard(quick, 785, 85, "▤", "Laporan Pembayaran", "Lihat pembayaran kasir.", ShowPembayaran);
+        }
+
+        void ShowBooking()
+        {
+            TopBar("Kelola Booking", "Kelola semua data booking studio.");
+            AddButton(contentPanel, "Refresh", 860, 105, 160, 42, Blue, Color.White, (s, e) => ShowBooking());
+
+            Panel box = RoundedPanel(1020, 515, 18, Card);
+            box.Location = new Point(30, 165);
+            contentPanel.Controls.Add(box);
+
+            string[] h = { "ID", "Nama", "Studio", "Tanggal", "Jam", "Total", "Booking", "Bayar", "Aksi" };
+            int[] x = { 25, 110, 245, 350, 465, 570, 675, 790, 910 };
+            AddTableHeader(box, h, x, 35);
+
+            using (SqlConnection conn = new SqlConnection(connString))
+            {
+                conn.Open();
+                string q = @"
+                    SELECT TOP 8
+                        b.id_booking, b.nama_pemesan, s.nama_studio, b.tanggal,
+                        CONVERT(VARCHAR(5), b.jam_mulai, 108) AS jam,
+                        b.total_harga, b.status_booking, b.status_pembayaran
+                    FROM Booking b
+                    INNER JOIN Studio s ON b.id_studio = s.id_studio
+                    ORDER BY b.id_booking DESC";
+
+                SqlCommand cmd = new SqlCommand(q, conn);
+                SqlDataReader r = cmd.ExecuteReader();
+
+                int y = 95;
+                while (r.Read())
+                {
+                    int id = Convert.ToInt32(r["id_booking"]);
+                    AddBookingRow(box, id, "BK" + id, r["nama_pemesan"].ToString(), r["nama_studio"].ToString(),
+                        Convert.ToDateTime(r["tanggal"]).ToString("dd/MM/yy"), r["jam"].ToString(),
+                        FormatRupiah(Convert.ToInt32(r["total_harga"])), r["status_booking"].ToString(),
+                        r["status_pembayaran"].ToString(), y);
+                    y += 55;
+                }
+
+                r.Close();
+                if (y == 95) AddLabel(box, "Belum ada data booking.", 25, 105, 10, false, Color.Gray);
+            }
+        }
+
+        void ShowStudio()
+        {
+            TopBar("Kelola Studio", "Kelola semua studio dan harga sewa.");
+            AddButton(contentPanel, "+ Tambah Studio", 840, 105, 180, 42, Blue, Color.White, (s, e) => ShowStudioForm(0, "", "", 0, "", "Aktif"));
+
+            AddStatCard(30, 120, "▦", "Total Studio", CountDb("SELECT COUNT(*) FROM Studio").ToString(), "Semua Studio", Color.FromArgb(240, 245, 255), Blue);
+            AddStatCard(290, 120, "✓", "Studio Aktif", CountDb("SELECT COUNT(*) FROM Studio WHERE status='Aktif'").ToString(), "Ditampilkan", Color.FromArgb(235, 255, 242), Color.Green);
+            AddStatCard(550, 120, "□", "Studio Nonaktif", CountDb("SELECT COUNT(*) FROM Studio WHERE status<>'Aktif'").ToString(), "Disembunyikan", Color.FromArgb(255, 246, 225), Color.Orange);
+
+            Panel box = RoundedPanel(1020, 420, 18, Card);
+            box.Location = new Point(30, 285);
+            contentPanel.Controls.Add(box);
+
+            AddLabel(box, "Daftar Studio", 25, 20, 14, true, TextDark);
+            string[] h = { "ID", "Nama Studio", "Jenis", "Harga / Jam", "Kapasitas", "Status", "Aksi" };
+            int[] x = { 25, 140, 310, 465, 610, 760, 890 };
+            AddTableHeader(box, h, x, 75);
+
+            using (SqlConnection conn = new SqlConnection(connString))
+            {
+                conn.Open();
+                SqlCommand cmd = new SqlCommand("SELECT * FROM Studio ORDER BY id_studio", conn);
+                SqlDataReader r = cmd.ExecuteReader();
+
+                int y = 130;
+                while (r.Read())
+                {
+                    int id = Convert.ToInt32(r["id_studio"]);
+                    AddStudioRow(box, id, "ST" + id.ToString("000"), r["nama_studio"].ToString(),
+                        r["jenis_studio"].ToString(), FormatRupiah(Convert.ToInt32(r["harga_per_jam"])),
+                        r["kapasitas"].ToString(), r["status"].ToString(), y);
+                    y += 65;
+                }
+
+                r.Close();
+                if (y == 130) AddLabel(box, "Belum ada data studio.", 25, 140, 10, false, Color.Gray);
+            }
+        }
+
+        void ShowLayanan()
+        {
+            TopBar("Kelola Layanan", "Kelola layanan tambahan yang tersedia.");
+            AddButton(contentPanel, "+ Tambah Layanan", 825, 105, 195, 42, Blue, Color.White, (s, e) => ShowLayananForm(0, "", 0, "Aktif"));
+
+            AddStatCard(30, 120, "≡", "Total Layanan", CountDb("SELECT COUNT(*) FROM Layanan").ToString(), "Semua Layanan", Color.FromArgb(240, 245, 255), Blue);
+            AddStatCard(290, 120, "✓", "Layanan Aktif", CountDb("SELECT COUNT(*) FROM Layanan WHERE status='Aktif'").ToString(), "Ditampilkan", Color.FromArgb(235, 255, 242), Color.Green);
+            AddStatCard(550, 120, "□", "Layanan Nonaktif", CountDb("SELECT COUNT(*) FROM Layanan WHERE status<>'Aktif'").ToString(), "Disembunyikan", Color.FromArgb(255, 246, 225), Color.Orange);
+
+            Panel box = RoundedPanel(1020, 420, 18, Card);
+            box.Location = new Point(30, 285);
+            contentPanel.Controls.Add(box);
+
+            string[] h = { "ID", "Nama Layanan", "Harga", "Status", "Aksi" };
+            int[] x = { 25, 170, 420, 610, 790 };
+            AddTableHeader(box, h, x, 75);
+
+            using (SqlConnection conn = new SqlConnection(connString))
+            {
+                conn.Open();
+                SqlCommand cmd = new SqlCommand("SELECT * FROM Layanan ORDER BY id_layanan", conn);
+                SqlDataReader r = cmd.ExecuteReader();
+
+                int y = 130;
+                while (r.Read())
+                {
+                    int id = Convert.ToInt32(r["id_layanan"]);
+                    AddLayananRow(box, id, "LY" + id.ToString("000"), r["nama_layanan"].ToString(),
+                        FormatRupiah(Convert.ToInt32(r["harga"])), r["status"].ToString(), y);
+                    y += 65;
+                }
+
+                r.Close();
+                if (y == 130) AddLabel(box, "Belum ada data layanan.", 25, 140, 10, false, Color.Gray);
+            }
+        }
+
+        void ShowPembayaran()
+        {
+            TopBar("Laporan Pembayaran", "Lihat pembayaran yang sudah dikonfirmasi kasir.");
+            AddButton(contentPanel, "Refresh", 860, 105, 160, 42, Blue, Color.White, (s, e) => ShowPembayaran());
+
+            AddStatCard(30, 120, "▦", "Total Transaksi", CountDb("SELECT COUNT(*) FROM Pembayaran").ToString(), "Transaksi", Color.FromArgb(240, 245, 255), Blue);
+            AddStatCard(290, 120, "Rp", "Total Pendapatan", FormatRupiah(CountDb("SELECT ISNULL(SUM(jumlah_bayar),0) FROM Pembayaran")), "Total", Color.FromArgb(235, 255, 242), Color.Green);
+            AddStatCard(550, 120, "◷", "Menunggu Kasir", CountDb("SELECT COUNT(*) FROM Booking WHERE status_pembayaran='Belum Lunas'").ToString(), "Transaksi", Color.FromArgb(255, 246, 225), Color.Orange);
+
+            Panel box = RoundedPanel(1020, 420, 18, Card);
+            box.Location = new Point(30, 285);
+            contentPanel.Controls.Add(box);
+
+            string[] h = { "ID", "Nama", "Studio", "Tanggal", "Total", "Metode", "Status", "Kasir" };
+            int[] x = { 25, 120, 270, 390, 520, 650, 770, 900 };
+            AddTableHeader(box, h, x, 75);
+
+            using (SqlConnection conn = new SqlConnection(connString))
+            {
+                conn.Open();
+                string q = @"
+                    SELECT TOP 6
+                        b.id_booking, b.nama_pemesan, s.nama_studio, p.tanggal_bayar,
+                        p.jumlah_bayar, p.metode_pembayaran, p.status_pembayaran
+                    FROM Pembayaran p
+                    INNER JOIN Booking b ON p.id_booking = b.id_booking
+                    INNER JOIN Studio s ON b.id_studio = s.id_studio
+                    ORDER BY p.tanggal_bayar DESC";
+
+                SqlCommand cmd = new SqlCommand(q, conn);
+                SqlDataReader r = cmd.ExecuteReader();
+
+                int y = 130;
+                while (r.Read())
+                {
+                    AddBayarRow(box, "BK" + r["id_booking"], r["nama_pemesan"].ToString(),
+                        r["nama_studio"].ToString(), Convert.ToDateTime(r["tanggal_bayar"]).ToString("dd/MM/yy"),
+                        FormatRupiah(Convert.ToInt32(r["jumlah_bayar"])), r["metode_pembayaran"].ToString(),
+                        r["status_pembayaran"].ToString(), "Kasir", y);
+                    y += 65;
+                }
+
+                r.Close();
+                if (y == 130) AddLabel(box, "Belum ada laporan pembayaran.", 25, 140, 10, false, Color.Gray);
+            }
+        }
+
+        void ShowStudioForm(int id, string nama, string jenis, int harga, string kapasitas, string status)
+        {
+            Form f = new Form();
+            f.Text = id == 0 ? "Tambah Studio" : "Edit Studio";
+            f.Size = new Size(420, 390);
+            f.StartPosition = FormStartPosition.CenterScreen;
+            f.FormBorderStyle = FormBorderStyle.FixedDialog;
+            f.MaximizeBox = false;
+
+            TextBox txtNama = MakeTextBox(f, "Nama Studio", nama, 30, 35);
+            TextBox txtJenis = MakeTextBox(f, "Jenis Studio", jenis, 30, 95);
+            TextBox txtHarga = MakeTextBox(f, "Harga / Jam", harga == 0 ? "" : harga.ToString(), 30, 155);
+            TextBox txtKapasitas = MakeTextBox(f, "Kapasitas", kapasitas, 30, 215);
+
+            ComboBox cbStatus = new ComboBox();
+            cbStatus.Items.AddRange(new string[] { "Aktif", "Nonaktif" });
+            cbStatus.Text = status == "" ? "Aktif" : status;
+            cbStatus.Location = new Point(160, 275);
+            cbStatus.Size = new Size(200, 28);
+            f.Controls.Add(new Label() { Text = "Status", Location = new Point(30, 278), AutoSize = true });
+            f.Controls.Add(cbStatus);
+
+            Button save = new Button();
+            save.Text = "Simpan";
+            save.Location = new Point(250, 320);
+            save.Size = new Size(110, 35);
+            save.Click += (s, e) =>
+            {
+                int hargaValue;
+                if (txtNama.Text.Trim() == "" || !int.TryParse(txtHarga.Text.Trim(), out hargaValue))
+                {
+                    MessageBox.Show("Nama wajib diisi dan harga harus angka.");
+                    return;
+                }
+
+                using (SqlConnection conn = new SqlConnection(connString))
+                {
+                    conn.Open();
+
+                    string q = id == 0
+                        ? @"INSERT INTO Studio (nama_studio, jenis_studio, harga_per_jam, kapasitas, status)
+                            VALUES (@nama, @jenis, @harga, @kapasitas, @status)"
+                        : @"UPDATE Studio SET nama_studio=@nama, jenis_studio=@jenis, harga_per_jam=@harga, kapasitas=@kapasitas, status=@status
+                            WHERE id_studio=@id";
+
+                    SqlCommand cmd = new SqlCommand(q, conn);
+                    cmd.Parameters.AddWithValue("@nama", txtNama.Text.Trim());
+                    cmd.Parameters.AddWithValue("@jenis", txtJenis.Text.Trim());
+                    cmd.Parameters.AddWithValue("@harga", hargaValue);
+                    cmd.Parameters.AddWithValue("@kapasitas", txtKapasitas.Text.Trim());
+                    cmd.Parameters.AddWithValue("@status", cbStatus.Text);
+                    if (id != 0) cmd.Parameters.AddWithValue("@id", id);
+                    cmd.ExecuteNonQuery();
+                }
+
+                f.Close();
+                ShowStudio();
+            };
+
+            f.Controls.Add(save);
+            f.ShowDialog();
+        }
+
+        void ShowLayananForm(int id, string nama, int harga, string status)
+        {
+            Form f = new Form();
+            f.Text = id == 0 ? "Tambah Layanan" : "Edit Layanan";
+            f.Size = new Size(420, 310);
+            f.StartPosition = FormStartPosition.CenterScreen;
+            f.FormBorderStyle = FormBorderStyle.FixedDialog;
+            f.MaximizeBox = false;
+
+            TextBox txtNama = MakeTextBox(f, "Nama Layanan", nama, 30, 45);
+            TextBox txtHarga = MakeTextBox(f, "Harga", harga == 0 ? "" : harga.ToString(), 30, 115);
+
+            ComboBox cbStatus = new ComboBox();
+            cbStatus.Items.AddRange(new string[] { "Aktif", "Nonaktif" });
+            cbStatus.Text = status == "" ? "Aktif" : status;
+            cbStatus.Location = new Point(160, 185);
+            cbStatus.Size = new Size(200, 28);
+            f.Controls.Add(new Label() { Text = "Status", Location = new Point(30, 188), AutoSize = true });
+            f.Controls.Add(cbStatus);
+
+            Button save = new Button();
+            save.Text = "Simpan";
+            save.Location = new Point(250, 230);
+            save.Size = new Size(110, 35);
+            save.Click += (s, e) =>
+            {
+                int hargaValue;
+                if (txtNama.Text.Trim() == "" || !int.TryParse(txtHarga.Text.Trim(), out hargaValue))
+                {
+                    MessageBox.Show("Nama wajib diisi dan harga harus angka.");
+                    return;
+                }
+
+                using (SqlConnection conn = new SqlConnection(connString))
+                {
+                    conn.Open();
+
+                    string q = id == 0
+                        ? @"INSERT INTO Layanan (nama_layanan, harga, status) VALUES (@nama, @harga, @status)"
+                        : @"UPDATE Layanan SET nama_layanan=@nama, harga=@harga, status=@status WHERE id_layanan=@id";
+
+                    SqlCommand cmd = new SqlCommand(q, conn);
+                    cmd.Parameters.AddWithValue("@nama", txtNama.Text.Trim());
+                    cmd.Parameters.AddWithValue("@harga", hargaValue);
+                    cmd.Parameters.AddWithValue("@status", cbStatus.Text);
+                    if (id != 0) cmd.Parameters.AddWithValue("@id", id);
+                    cmd.ExecuteNonQuery();
+                }
+
+                f.Close();
+                ShowLayanan();
+            };
+
+            f.Controls.Add(save);
+            f.ShowDialog();
+        }
+
+        TextBox MakeTextBox(Form f, string label, string value, int x, int y)
+        {
+            Label l = new Label();
+            l.Text = label;
+            l.Location = new Point(x, y);
+            l.AutoSize = true;
+            f.Controls.Add(l);
+
+            TextBox t = new TextBox();
+            t.Text = value;
+            t.Location = new Point(x + 130, y - 3);
+            t.Size = new Size(200, 28);
+            f.Controls.Add(t);
+
+            return t;
+        }
+
+        void DeleteStudio(int id)
+        {
+            if (MessageBox.Show("Yakin hapus studio ini?", "Hapus Studio", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(connString))
+                {
+                    conn.Open();
+                    SqlCommand cmd = new SqlCommand("DELETE FROM Studio WHERE id_studio=@id", conn);
+                    cmd.Parameters.AddWithValue("@id", id);
+                    cmd.ExecuteNonQuery();
+                }
+                ShowStudio();
+            }
+            catch
+            {
+                MessageBox.Show("Studio tidak bisa dihapus karena sudah dipakai booking.\nUbah status jadi Nonaktif aja.");
+            }
+        }
+
+        void DeleteLayanan(int id)
+        {
+            if (MessageBox.Show("Yakin hapus layanan ini?", "Hapus Layanan", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(connString))
+                {
+                    conn.Open();
+                    SqlCommand cmd = new SqlCommand("DELETE FROM Layanan WHERE id_layanan=@id", conn);
+                    cmd.Parameters.AddWithValue("@id", id);
+                    cmd.ExecuteNonQuery();
+                }
+                ShowLayanan();
+            }
+            catch
+            {
+                MessageBox.Show("Layanan tidak bisa dihapus karena sudah dipakai booking.\nUbah status jadi Nonaktif aja.");
+            }
+        }
+
+        void DeleteBooking(int id)
+        {
+            if (MessageBox.Show("Yakin hapus booking ini?", "Hapus Booking", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(connString))
+                {
+                    conn.Open();
+                    SqlCommand c1 = new SqlCommand("DELETE FROM Booking_Layanan WHERE id_booking=@id", conn);
+                    c1.Parameters.AddWithValue("@id", id);
+                    c1.ExecuteNonQuery();
+
+                    SqlCommand c2 = new SqlCommand("DELETE FROM Pembayaran WHERE id_booking=@id", conn);
+                    c2.Parameters.AddWithValue("@id", id);
+                    c2.ExecuteNonQuery();
+
+                    SqlCommand c3 = new SqlCommand("DELETE FROM Booking WHERE id_booking=@id", conn);
+                    c3.Parameters.AddWithValue("@id", id);
+                    c3.ExecuteNonQuery();
+                }
+                ShowBooking();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Gagal hapus booking:\n" + ex.Message);
+            }
+        }
+
+        int AmbilHargaStudio(int id)
+        {
+            using (SqlConnection conn = new SqlConnection(connString))
+            {
+                conn.Open();
+                SqlCommand cmd = new SqlCommand("SELECT harga_per_jam FROM Studio WHERE id_studio=@id", conn);
+                cmd.Parameters.AddWithValue("@id", id);
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+
+        int AmbilHargaLayanan(int id)
+        {
+            using (SqlConnection conn = new SqlConnection(connString))
+            {
+                conn.Open();
+                SqlCommand cmd = new SqlCommand("SELECT harga FROM Layanan WHERE id_layanan=@id", conn);
+                cmd.Parameters.AddWithValue("@id", id);
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+
+        int CountDb(string query)
+        {
+            using (SqlConnection conn = new SqlConnection(connString))
+            {
+                conn.Open();
+                SqlCommand cmd = new SqlCommand(query, conn);
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+
+        string FormatRupiah(int value)
+        {
+            return "Rp " + value.ToString("N0").Replace(",", ".");
+        }
+
+        void AddBookingRow(Control p, int realId, string id, string nama, string studio, string tgl, string jam, string total, string status, string bayar, int y)
+        {
+            AddLabel(p, id, 25, y, 8, false, TextDark);
+            AddLabel(p, nama, 110, y, 8, false, TextDark);
+            AddLabel(p, studio, 245, y, 8, false, TextDark);
+            AddLabel(p, tgl, 350, y, 8, false, TextDark);
+            AddLabel(p, jam, 465, y, 8, false, TextDark);
+            AddLabel(p, total, 570, y, 8, false, TextDark);
+            AddBadge(p, status, 675, y - 5, status == "Selesai" ? Color.Green : status == "Dibooking" ? Blue : Color.Orange);
+            AddBadge(p, bayar, 790, y - 5, bayar == "Lunas" ? Color.Green : Color.Red);
+            AddMiniButton(p, "🗑", 930, y - 7, Color.Red, (s, e) => DeleteBooking(realId));
+            AddLine(p, 20, y + 40, 980);
+        }
+
+        void AddStudioRow(Control p, int realId, string id, string nama, string jenis, string harga, string kapasitas, string status, int y)
+        {
+            AddLabel(p, id, 25, y, 8, false, TextDark);
+            AddLabel(p, nama, 140, y, 8, true, TextDark);
+            AddLabel(p, jenis, 310, y, 8, false, TextDark);
+            AddLabel(p, harga, 465, y, 8, false, TextDark);
+            AddLabel(p, kapasitas, 610, y, 8, false, TextDark);
+            AddBadge(p, status, 760, y - 5, status == "Aktif" ? Color.Green : Color.Orange);
+            AddMiniButton(p, "✎", 890, y - 7, Color.Orange, (s, e) => ShowStudioForm(realId, nama, jenis, AmbilHargaStudio(realId), kapasitas, status));
+            AddMiniButton(p, "🗑", 930, y - 7, Color.Red, (s, e) => DeleteStudio(realId));
+            AddLine(p, 20, y + 45, 980);
+        }
+
+        void AddLayananRow(Control p, int realId, string id, string nama, string harga, string status, int y)
+        {
+            AddLabel(p, id, 25, y, 8, false, TextDark);
+            AddLabel(p, nama, 170, y, 8, true, TextDark);
+            AddLabel(p, harga, 420, y, 8, false, TextDark);
+            AddBadge(p, status, 610, y - 5, status == "Aktif" ? Color.Green : Color.Orange);
+            AddMiniButton(p, "✎", 790, y - 7, Color.Orange, (s, e) => ShowLayananForm(realId, nama, AmbilHargaLayanan(realId), status));
+            AddMiniButton(p, "🗑", 830, y - 7, Color.Red, (s, e) => DeleteLayanan(realId));
+            AddLine(p, 20, y + 45, 980);
+        }
+
+        void AddBayarRow(Control p, string id, string nama, string studio, string tgl, string total, string metode, string status, string kasir, int y)
+        {
+            AddLabel(p, id, 25, y, 8, false, TextDark);
+            AddLabel(p, nama, 120, y, 8, false, TextDark);
+            AddLabel(p, studio, 270, y, 8, false, TextDark);
+            AddLabel(p, tgl, 390, y, 8, false, TextDark);
+            AddLabel(p, total, 520, y, 8, false, TextDark);
+            AddLabel(p, metode, 650, y, 8, false, TextDark);
+            AddBadge(p, status, 770, y - 5, status == "Lunas" ? Color.Green : Color.Orange);
+            AddLabel(p, kasir, 900, y, 8, false, TextDark);
+            AddLine(p, 20, y + 45, 980);
+        }
+
+        void AddQuickCard(Control parent, int x, int y, string icon, string title, string desc, Action action)
+        {
+            Panel card = RoundedPanel(215, 200, 15, Color.White);
+            card.Location = new Point(x, y);
+            card.Cursor = Cursors.Hand;
+            parent.Controls.Add(card);
+            AddLabel(card, icon, 88, 25, 32, true, Blue);
+            AddLabel(card, title, 35, 85, 12, true, TextDark);
+            AddLabel(card, desc, 28, 120, 9, false, Color.FromArgb(70, 85, 110));
+            AddLabel(card, "→", 175, 155, 22, true, Blue);
+            card.Click += (s, e) => { SetActiveMenu(title); action(); };
+        }
+
+        void AddStatCard(int x, int y, string icon, string title, string value, string desc, Color bg, Color color)
+        {
+            Panel card = RoundedPanel(235, 110, 15, Card);
             card.Location = new Point(x, y);
             contentPanel.Controls.Add(card);
 
-            AddPic(card, icon, 22, 22, 36, 36);
-            AddText(card, title, 75, 29, 10, true, Color.FromArgb(51, 65, 85));
-            AddText(card, value, 22, 70, value.Length > 8 ? 18 : 22, true, Color.Black);
-            AddText(card, desc, 22, 105, 9, false, Color.FromArgb(100, 116, 139));
+            Panel iconBox = RoundedPanel(60, 60, 14, bg);
+            iconBox.Location = new Point(18, 25);
+            card.Controls.Add(iconBox);
+
+            AddLabel(iconBox, icon, 16, 10, 22, true, color);
+            AddLabel(card, title, 95, 25, 9, true, TextDark);
+            AddLabel(card, value, 95, 50, value.Length > 6 ? 14 : 20, true, color);
+            AddLabel(card, desc, 95, 82, 8, false, Color.FromArgb(90, 103, 125));
         }
 
-        void AddRecentBookingPanel()
+        void AddTableHeader(Control p, string[] headers, int[] xs, int y)
         {
-            Panel box = RoundedPanel(735, 380, 16, Color.White);
-            box.Location = new Point(50, 310);
-            contentPanel.Controls.Add(box);
-
-            AddText(box, "Ringkasan Booking Terbaru", 22, 18, 12, true);
-
-            Label lihat = new Label();
-            lihat.Text = "Lihat Semua";
-            lihat.Font = new Font("Segoe UI", 9, FontStyle.Bold);
-            lihat.ForeColor = Color.FromArgb(37, 99, 235);
-            lihat.AutoSize = true;
-            lihat.Location = new Point(635, 20);
-            box.Controls.Add(lihat);
-
-            AddLine(box, 0, 55, 735);
-
-            AddBookingRow(box, Properties.Resources.calendergreen, "Studio A", "Band Room", "29 Mei 2025 • 13:00 - 15:00 • 2 Jam", "Menunggu", Color.Orange, 80);
-            AddBookingRow(box, Properties.Resources.mulaibookingicon, "Studio B", "Vocal Room", "29 Mei 2025 • 15:00 - 17:00 • 2 Jam", "Menunggu", Color.Orange, 155);
-            AddBookingRow(box, Properties.Resources.musicpurple, "Studio C", "Instrument Room", "28 Mei 2025 • 10:00 - 12:00 • 2 Jam", "Dikonfirmasi", Color.Green, 230);
-            AddBookingRow(box, Properties.Resources.calendergreen, "Studio A", "Band Room", "27 Mei 2025 • 19:00 - 22:00 • 3 Jam", "Selesai", Color.Green, 305);
-        }
-
-        void AddBookingRow(Panel parent, Image icon, string studio, string room, string info, string status, Color statusColor, int y)
-        {
-            AddPic(parent, icon, 28, y, 42, 42);
-            AddText(parent, studio, 92, y - 2, 11, true);
-            AddText(parent, "(" + room + ")", 165, y, 9, false, Color.FromArgb(100, 116, 139));
-            AddText(parent, info, 92, y + 25, 9, false, Color.FromArgb(71, 85, 105));
-
-            Label st = new Label();
-            st.Text = status;
-            st.Font = new Font("Segoe UI", 8, FontStyle.Bold);
-            st.ForeColor = statusColor == Color.Orange ? Color.FromArgb(245, 158, 11) : Color.FromArgb(22, 163, 74);
-            st.BackColor = statusColor == Color.Orange ? Color.FromArgb(255, 247, 237) : Color.FromArgb(220, 252, 231);
-            st.TextAlign = ContentAlignment.MiddleCenter;
-            st.Size = new Size(95, 28);
-            st.Location = new Point(610, y + 6);
-            parent.Controls.Add(st);
-            MakeRounded(st, 12);
-        }
-
-        void AddQuickButtonPanel()
-        {
-            Panel box = RoundedPanel(430, 380, 16, Color.White);
-            box.Location = new Point(815, 310);
-            contentPanel.Controls.Add(box);
-
-            AddText(box, "Tombol Cepat", 22, 18, 12, true);
-
-            AddQuickButton(box, "+", "Tambah Studio", "Tambah studio baru", 70, Color.FromArgb(37, 99, 235), Color.FromArgb(239, 246, 255));
-            AddQuickButton(box, "▣", "Atur Jadwal Operasional", "Kelola jam operasional studio", 155, Color.FromArgb(37, 99, 235), Color.FromArgb(239, 246, 255));
-            AddQuickButton(box, "▣", "Cek Booking", "Lihat & konfirmasi booking masuk", 240, Color.FromArgb(22, 163, 74), Color.FromArgb(240, 253, 244));
-        }
-
-        void AddQuickButton(Panel parent, string icon, string title, string desc, int y, Color color, Color bg)
-        {
-            Panel btn = RoundedPanel(380, 72, 14, bg);
-            btn.Location = new Point(25, y);
-            btn.Cursor = Cursors.Hand;
-            parent.Controls.Add(btn);
-
-            AddText(btn, icon, 25, 12, 26, true, color);
-            AddText(btn, title, 85, 14, 11, true, color);
-            AddText(btn, desc, 85, 40, 9, false, Color.FromArgb(71, 85, 105));
-
-            if (title == "Tambah Studio")
-                btn.Click += (s, e) => { SetActiveMenu("Kelola Studio"); ShowStudioPage(); };
-
-            if (title == "Atur Jadwal Operasional")
-                btn.Click += (s, e) => { SetActiveMenu("Kelola Jadwal Operasional"); ShowJadwalOperasionalPage(); };
-
-            if (title == "Cek Booking")
-                btn.Click += (s, e) => { SetActiveMenu("Konfirmasi Booking"); ShowKonfirmasiPage(); };
-        }
-
-        void ShowStudioPage()
-        {
-            contentPanel.Controls.Clear();
-
-            AddText(contentPanel, "Kelola Studio", 50, 45, 22, true);
-            AddText(contentPanel, "Kelola semua studio yang tersedia di Triosic Music Studio.", 52, 85, 10, false, Color.FromArgb(100, 116, 139));
-
-            Button add = new Button();
-            add.Text = "+  Tambah Studio";
-            add.Font = new Font("Segoe UI", 10, FontStyle.Bold);
-            add.ForeColor = Color.White;
-            add.BackColor = Color.FromArgb(37, 99, 235);
-            add.FlatStyle = FlatStyle.Flat;
-            add.FlatAppearance.BorderSize = 0;
-            add.Size = new Size(160, 44);
-            add.Location = new Point(1000, 45);
-            contentPanel.Controls.Add(add);
-            MakeRounded(add, 8);
-
-            Panel table = RoundedPanel(1110, 520, 12, Color.White);
-            table.Location = new Point(50, 130);
-            contentPanel.Controls.Add(table);
-
-            AddStudioHeader(table);
-            AddStudioRow(table, 1, Properties.Resources.calendergreen, "Studio A", "Band Room", "Band Room", "Rp200.000", "6 Orang", 85);
-            AddStudioRow(table, 2, Properties.Resources.mulaibookingicon, "Studio B", "Vocal Room", "Vocal Room", "Rp150.000", "3 Orang", 215);
-            AddStudioRow(table, 3, Properties.Resources.musicpurple, "Studio C", "Instrument Room", "Instrument Room", "Rp125.000", "4 Orang", 345);
-        }
-
-        void AddStudioHeader(Panel table)
-        {
-            string[] headers = { "No", "Nama Studio", "Jenis Studio", "Harga / Jam", "Kapasitas", "Status", "Aksi" };
-            int[] xs = { 35, 160, 360, 540, 710, 860, 1000 };
+            Panel head = new Panel();
+            head.BackColor = Color.FromArgb(245, 249, 255);
+            head.Location = new Point(20, y);
+            head.Size = new Size(980, 45);
+            p.Controls.Add(head);
 
             for (int i = 0; i < headers.Length; i++)
-                AddText(table, headers[i], xs[i], 35, 10, true);
-
-            AddLine(table, 0, 75, 1110);
+                AddLabel(head, headers[i], xs[i] - 20, 13, 8, true, TextDark);
         }
 
-        void AddStudioRow(Panel table, int no, Image icon, string nama, string subNama, string jenis, string harga, string kapasitas, int y)
+        void AddBadge(Control p, string text, int x, int y, Color color)
         {
-            AddText(table, no.ToString(), 35, y + 35, 12, true);
-            AddPic(table, icon, 90, y + 20, 55, 55);
-
-            AddText(table, nama, 160, y + 22, 12, true);
-            AddText(table, subNama, 160, y + 50, 9, false, Color.FromArgb(100, 116, 139));
-
-            AddText(table, jenis, 360, y + 35, 10, false);
-            AddText(table, harga, 540, y + 35, 10, false);
-            AddText(table, kapasitas, 710, y + 35, 10, false);
-
-            Label status = new Label();
-            status.Text = "Aktif";
-            status.Font = new Font("Segoe UI", 9, FontStyle.Bold);
-            status.ForeColor = Color.FromArgb(22, 163, 74);
-            status.BackColor = Color.FromArgb(220, 252, 231);
-            status.TextAlign = ContentAlignment.MiddleCenter;
-            status.Size = new Size(70, 30);
-            status.Location = new Point(860, y + 30);
-            table.Controls.Add(status);
-            MakeRounded(status, 8);
-
-            Button edit = SmallActionButton("✎", Color.FromArgb(37, 99, 235));
-            edit.Location = new Point(990, y + 25);
-            table.Controls.Add(edit);
-
-            Button del = SmallActionButton("🗑", Color.Red);
-            del.Location = new Point(1045, y + 25);
-            table.Controls.Add(del);
-
-            AddLine(table, 0, y + 105, 1110);
+            Label b = new Label();
+            b.Text = text;
+            b.Font = new Font("Segoe UI", 8, FontStyle.Bold);
+            b.ForeColor = color;
+            b.BackColor = Color.FromArgb(235, 245, 240);
+            b.TextAlign = ContentAlignment.MiddleCenter;
+            b.Location = new Point(x, y);
+            b.Size = new Size(90, 27);
+            p.Controls.Add(b);
+            MakeRounded(b, 8);
         }
 
-        Button SmallActionButton(string text, Color color)
+        void AddMiniButton(Control p, string text, int x, int y, Color color, EventHandler click)
         {
             Button b = new Button();
             b.Text = text;
-            b.Font = new Font("Segoe UI", 13, FontStyle.Bold);
+            b.Font = new Font("Segoe UI", 8, FontStyle.Bold);
             b.ForeColor = color;
             b.BackColor = Color.White;
             b.FlatStyle = FlatStyle.Flat;
-            b.FlatAppearance.BorderColor = Color.FromArgb(215, 225, 240);
-            b.Size = new Size(42, 40);
-            return b;
+            b.FlatAppearance.BorderColor = color;
+            b.Size = new Size(30, 30);
+            b.Location = new Point(x, y);
+            if (click != null) b.Click += click;
+            p.Controls.Add(b);
+            MakeRounded(b, 7);
         }
 
-        void ShowJadwalOperasionalPage()
+        void AddButton(Control p, string text, int x, int y, int w, int h, Color bg, Color fg, EventHandler click)
         {
-            contentPanel.Controls.Clear();
-
-            AddText(contentPanel, "Kelola Jadwal Operasional", 50, 45, 20, true);
-            AddText(contentPanel, "Atur jam operasional studio dan slot waktu yang tersedia.", 52, 82, 10, false, Color.FromArgb(100, 116, 139));
-
-            Button add = new Button();
-            add.Text = "+  Atur Jadwal";
-            add.Font = new Font("Segoe UI", 9, FontStyle.Bold);
-            add.ForeColor = Color.White;
-            add.BackColor = Color.FromArgb(37, 99, 235);
-            add.FlatStyle = FlatStyle.Flat;
-            add.FlatAppearance.BorderSize = 0;
-            add.Size = new Size(120, 42);
-            add.Location = new Point(1030, 38);
-            contentPanel.Controls.Add(add);
-            MakeRounded(add, 8);
-
-            Panel table = RoundedPanel(720, 370, 10, Color.White);
-            table.Location = new Point(50, 115);
-            contentPanel.Controls.Add(table);
-
-            AddText(table, "Hari", 25, 22, 9, true);
-            AddText(table, "Status", 165, 22, 9, true);
-            AddText(table, "Jam Operasional", 300, 22, 9, true);
-            AddText(table, "Slot Waktu", 505, 22, 9, true);
-            AddText(table, "Aksi", 650, 22, 9, true);
-
-            AddLine(table, 0, 55, 720);
-
-            AddJadwalRow(table, "Senin", "Buka", "09:00 - 22:00", "1 Jam / slot", 70, true);
-            AddJadwalRow(table, "Selasa", "Buka", "09:00 - 22:00", "1 Jam / slot", 110, true);
-            AddJadwalRow(table, "Rabu", "Buka", "09:00 - 23:00", "1 Jam / slot", 150, true);
-            AddJadwalRow(table, "Kamis", "Buka", "09:00 - 22:00", "1 Jam / slot", 190, true);
-            AddJadwalRow(table, "Jumat", "Buka", "09:00 - 23:00", "1 Jam / slot", 230, true);
-            AddJadwalRow(table, "Sabtu", "Buka", "08:00 - 23:00", "1 Jam / slot", 270, true);
-            AddJadwalRow(table, "Minggu", "Tutup", "-", "-", 310, false);
-
-            Panel info = RoundedPanel(220, 155, 10, Color.FromArgb(240, 247, 255));
-            info.Location = new Point(800, 115);
-            contentPanel.Controls.Add(info);
-
-            AddText(info, "Informasi", 20, 18, 11, true);
-            AddText(info, "Slot waktu adalah\ninterval waktu minimal\nuntuk setiap booking.", 20, 50, 9, false, Color.FromArgb(71, 85, 105));
-            AddText(info, "Saat ini: 1 Jam / slot", 20, 120, 9, false, Color.FromArgb(71, 85, 105));
-
-            Panel note = RoundedPanel(220, 150, 10, Color.FromArgb(255, 250, 235));
-            note.Location = new Point(800, 295);
-            contentPanel.Controls.Add(note);
-
-            AddText(note, "Catatan", 20, 18, 11, true);
-            AddText(note, "Perubahan jadwal\nakan langsung\nberlaku untuk semua\npengguna.", 20, 52, 9, false, Color.FromArgb(71, 85, 105));
-        }
-
-        void AddJadwalRow(Panel parent, string hari, string status, string jam, string slot, int y, bool buka)
-        {
-            AddText(parent, hari, 25, y + 8, 9, true);
-
-            Label st = new Label();
-            st.Text = status;
-            st.Font = new Font("Segoe UI", 8, FontStyle.Bold);
-            st.ForeColor = buka ? Color.FromArgb(22, 163, 74) : Color.FromArgb(239, 68, 68);
-            st.BackColor = buka ? Color.FromArgb(220, 252, 231) : Color.FromArgb(254, 226, 226);
-            st.TextAlign = ContentAlignment.MiddleCenter;
-            st.Size = new Size(55, 24);
-            st.Location = new Point(160, y + 6);
-            parent.Controls.Add(st);
-            MakeRounded(st, 8);
-
-            AddText(parent, jam, 300, y + 8, 9, false);
-            AddText(parent, slot, 505, y + 8, 9, false);
-
-            Button edit = new Button();
-            edit.Text = "✎";
-            edit.Font = new Font("Segoe UI", 9, FontStyle.Bold);
-            edit.ForeColor = Color.FromArgb(37, 99, 235);
-            edit.BackColor = Color.FromArgb(239, 246, 255);
-            edit.FlatStyle = FlatStyle.Flat;
-            edit.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254);
-            edit.Size = new Size(32, 30);
-            edit.Location = new Point(645, y + 3);
-            parent.Controls.Add(edit);
-            MakeRounded(edit, 7);
-
-            AddLine(parent, 0, y + 38, 720);
-        }
-
-        void ShowKonfirmasiPage()
-        {
-            contentPanel.Controls.Clear();
-
-            AddText(contentPanel, "Konfirmasi Booking", 50, 45, 22, true);
-            AddText(contentPanel, "Review dan konfirmasi booking yang masuk dari pengguna.", 52, 85, 11, false, Color.FromArgb(100, 116, 139));
-
-            AddFilterButton("Semua (5)", 50, 135, false);
-            AddFilterButton("Menunggu (5)", 175, 135, true);
-            AddFilterButton("Dikonfirmasi (0)", 325, 135, false);
-            AddFilterButton("Ditolak (0)", 500, 135, false);
-
-            Button date = new Button();
-            date.Text = "Pilih Tanggal      📅";
-            date.Font = new Font("Segoe UI", 10, FontStyle.Bold);
-            date.ForeColor = Color.FromArgb(100, 116, 139);
-            date.BackColor = Color.White;
-            date.FlatStyle = FlatStyle.Flat;
-            date.FlatAppearance.BorderColor = Color.FromArgb(220, 230, 245);
-            date.Size = new Size(190, 45);
-            date.Location = new Point(1015, 135);
-            contentPanel.Controls.Add(date);
-            MakeRounded(date, 8);
-
-            Panel table = RoundedPanel(1155, 390, 12, Color.White);
-            table.Location = new Point(50, 205);
-            contentPanel.Controls.Add(table);
-
-            AddText(table, "No", 25, 25, 10, true);
-            AddText(table, "Detail Booking", 85, 25, 10, true);
-            AddText(table, "Studio", 315, 25, 10, true);
-            AddText(table, "Tanggal & Waktu", 515, 25, 10, true);
-            AddText(table, "Durasi", 675, 25, 10, true);
-            AddText(table, "Total", 780, 25, 10, true);
-            AddText(table, "Pembayaran", 895, 25, 10, true);
-            AddText(table, "Status", 1040, 25, 10, true);
-            AddText(table, "Aksi", 1110, 25, 10, true);
-
-            AddLine(table, 0, 60, 1155);
-
-            AddKonfirmasiRow(table, "1", "Budi Santoso", "budi@email.com", "0812-xxxx-xxxx",
-                Properties.Resources.calendergreen, "Studio A", "Band Room",
-                "29 Mei 2025\n13:00 - 15:00", "2 Jam", "Rp400.000",
-                "Transfer Bank\nBCA", 75);
-
-            AddKonfirmasiRow(table, "2", "Siti Rahma", "siti@email.com", "0813-xxxx-xxxx",
-                Properties.Resources.mulaibookingicon, "Studio B", "Vocal Room",
-                "29 Mei 2025\n15:00 - 17:00", "2 Jam", "Rp300.000",
-                "E-Wallet\nOVO", 175);
-
-            AddKonfirmasiRow(table, "3", "Andi Wijaya", "andi@email.com", "0814-xxxx-xxxx",
-                Properties.Resources.musicpurple, "Studio C", "Instrument Room",
-                "30 Mei 2025\n10:00 - 12:00", "2 Jam", "Rp250.000",
-                "Transfer Bank\nMandiri", 275);
-        }
-
-        void AddFilterButton(string text, int x, int y, bool active)
-        {
-            Button btn = new Button();
-            btn.Text = text;
-            btn.Font = new Font("Segoe UI", 10, FontStyle.Bold);
-            btn.ForeColor = active ? Color.FromArgb(37, 99, 235) : Color.FromArgb(80, 90, 110);
-            btn.BackColor = Color.White;
-            btn.FlatStyle = FlatStyle.Flat;
-            btn.FlatAppearance.BorderColor = active ? Color.FromArgb(37, 99, 235) : Color.FromArgb(220, 230, 245);
-            btn.FlatAppearance.BorderSize = active ? 2 : 1;
-            btn.Size = new Size(120, 45);
-            btn.Location = new Point(x, y);
-            contentPanel.Controls.Add(btn);
-            MakeRounded(btn, 8);
-        }
-
-        void AddKonfirmasiRow(
-            Panel table,
-            string no,
-            string nama,
-            string email,
-            string hp,
-            Image studioIcon,
-            string studio,
-            string jenis,
-            string tanggalJam,
-            string durasi,
-            string total,
-            string pembayaran,
-            int y)
-        {
-            AddText(table, no, 25, y + 35, 10, false);
-
-            AddText(table, nama, 85, y + 15, 10, true);
-            AddText(table, email, 85, y + 40, 9, false, Color.FromArgb(100, 116, 139));
-            AddText(table, hp, 85, y + 62, 9, false, Color.FromArgb(100, 116, 139));
-
-            AddPic(table, studioIcon, 315, y + 25, 45, 45);
-            AddText(table, studio, 370, y + 25, 10, true);
-            AddText(table, "(" + jenis + ")", 370, y + 50, 9, false, Color.FromArgb(100, 116, 139));
-
-            AddText(table, tanggalJam, 515, y + 25, 9, false);
-            AddText(table, durasi, 675, y + 35, 9, false);
-            AddText(table, total, 780, y + 35, 10, false);
-            AddText(table, pembayaran, 895, y + 25, 9, false);
-
-            Label status = new Label();
-            status.Text = "Menunggu";
-            status.Font = new Font("Segoe UI", 8, FontStyle.Bold);
-            status.ForeColor = Color.FromArgb(245, 158, 11);
-            status.BackColor = Color.FromArgb(255, 247, 237);
-            status.TextAlign = ContentAlignment.MiddleCenter;
-            status.Size = new Size(90, 30);
-            status.Location = new Point(1030, y + 30);
-            table.Controls.Add(status);
-            MakeRounded(status, 10);
-
-            Button acc = new Button();
-            acc.Text = "✓";
-            acc.Font = new Font("Segoe UI", 14, FontStyle.Bold);
-            acc.ForeColor = Color.White;
-            acc.BackColor = Color.FromArgb(22, 163, 74);
-            acc.FlatStyle = FlatStyle.Flat;
-            acc.FlatAppearance.BorderSize = 0;
-            acc.Size = new Size(38, 38);
-            acc.Location = new Point(1125, y + 25);
-            table.Controls.Add(acc);
-            MakeRounded(acc, 8);
-
-            Button reject = new Button();
-            reject.Text = "×";
-            reject.Font = new Font("Segoe UI", 14, FontStyle.Bold);
-            reject.ForeColor = Color.White;
-            reject.BackColor = Color.FromArgb(239, 68, 68);
-            reject.FlatStyle = FlatStyle.Flat;
-            reject.FlatAppearance.BorderSize = 0;
-            reject.Size = new Size(38, 38);
-            reject.Location = new Point(1170, y + 25);
-            table.Controls.Add(reject);
-            MakeRounded(reject, 8);
-
-            AddLine(table, 0, y + 95, 1155);
-        }
-
-        void ShowLaporanPage()
-        {
-            contentPanel.Controls.Clear();
-
-            AddText(contentPanel, "Laporan / Riwayat Booking", 50, 35, 22, true);
-            AddText(contentPanel, "Lihat semua riwayat booking dan laporan pendapatan.", 52, 75, 10, false, Color.FromArgb(100, 116, 139));
-
-            Button download = new Button();
-            download.Text = "↓  Download Laporan";
-            download.Font = new Font("Segoe UI", 10, FontStyle.Bold);
-            download.ForeColor = Color.FromArgb(37, 99, 235);
-            download.BackColor = Color.White;
-            download.FlatStyle = FlatStyle.Flat;
-            download.FlatAppearance.BorderColor = Color.FromArgb(37, 99, 235);
-            download.Size = new Size(190, 45);
-            download.Location = new Point(1010, 35);
-            contentPanel.Controls.Add(download);
-            MakeRounded(download, 8);
-
-            AddFilterBox("01 Mei 2025      📅", 50, 105, 170);
-            AddText(contentPanel, "s/d", 230, 117, 9, true, Color.FromArgb(71, 85, 105));
-            AddFilterBox("31 Mei 2025      📅", 270, 105, 170);
-            AddFilterBox("Semua Studio  ⌄", 470, 105, 170);
-            AddFilterBox("Semua Status  ⌄", 660, 105, 170);
-
-            Button filter = new Button();
-            filter.Text = "Filter";
-            filter.Font = new Font("Segoe UI", 9, FontStyle.Bold);
-            filter.ForeColor = Color.White;
-            filter.BackColor = Color.FromArgb(37, 99, 235);
-            filter.FlatStyle = FlatStyle.Flat;
-            filter.FlatAppearance.BorderSize = 0;
-            filter.Size = new Size(75, 42);
-            filter.Location = new Point(850, 105);
-            contentPanel.Controls.Add(filter);
-            MakeRounded(filter, 8);
-
-            AddLaporanStatCard(50, 170, Properties.Resources.card1icon, "Total Booking", "24", "Transaksi", Color.FromArgb(239, 246, 255), Color.FromArgb(37, 99, 235));
-            AddLaporanStatCard(255, 170, Properties.Resources.calendergreen, "Selesai", "18", "75%", Color.FromArgb(240, 253, 244), Color.FromArgb(22, 163, 74));
-            AddLaporanStatCard(460, 170, Properties.Resources.card2icon, "Dibatalkan", "3", "12.5%", Color.FromArgb(255, 251, 235), Color.FromArgb(245, 158, 11));
-            AddLaporanStatCard(665, 170, Properties.Resources.Logouticon, "Ditolak", "3", "12.5%", Color.FromArgb(254, 242, 242), Color.FromArgb(239, 68, 68));
-            AddLaporanStatCard(870, 170, Properties.Resources.card4icon, "Total Pendapatan", "Rp7.250.000", "", Color.FromArgb(250, 245, 255), Color.FromArgb(147, 51, 234));
-
-            Panel table = RoundedPanel(1155, 300, 10, Color.White);
-            table.Location = new Point(50, 265);
-            contentPanel.Controls.Add(table);
-
-            AddText(table, "No", 25, 22, 9, true);
-            AddText(table, "Tanggal", 95, 22, 9, true);
-            AddText(table, "Studio", 245, 22, 9, true);
-            AddText(table, "Penyewa", 365, 22, 9, true);
-            AddText(table, "Waktu", 525, 22, 9, true);
-            AddText(table, "Durasi", 665, 22, 9, true);
-            AddText(table, "Total", 775, 22, 9, true);
-            AddText(table, "Status", 905, 22, 9, true);
-            AddText(table, "Pembayaran", 1030, 22, 9, true);
-
-            AddLine(table, 0, 55, 1155);
-
-            AddLaporanRow(table, "1", "29 Mei 2025", "Studio A", "Budi Santoso", "13:00 - 15:00", "2 Jam", "Rp400.000", "Menunggu", "Transfer Bank\nBCA", 70, false);
-            AddLaporanRow(table, "2", "29 Mei 2025", "Studio B", "Siti Rahma", "15:00 - 17:00", "2 Jam", "Rp300.000", "Menunggu", "E-Wallet\nOVO", 120, false);
-            AddLaporanRow(table, "3", "28 Mei 2025", "Studio C", "Rizky Pratama", "10:00 - 12:00", "2 Jam", "Rp250.000", "Selesai", "Transfer Bank\nMandiri", 170, true);
-            AddLaporanRow(table, "4", "27 Mei 2025", "Studio A", "Dewi Lestari", "19:00 - 22:00", "3 Jam", "Rp600.000", "Selesai", "Transfer Bank\nBCA", 220, true);
-
-            AddText(contentPanel, "‹", 520, 590, 18, true, Color.FromArgb(148, 163, 184));
-
-            Button p1 = new Button();
-            p1.Text = "1";
-            p1.Font = new Font("Segoe UI", 10, FontStyle.Bold);
-            p1.ForeColor = Color.White;
-            p1.BackColor = Color.FromArgb(37, 99, 235);
-            p1.FlatStyle = FlatStyle.Flat;
-            p1.FlatAppearance.BorderSize = 0;
-            p1.Size = new Size(38, 38);
-            p1.Location = new Point(560, 585);
-            contentPanel.Controls.Add(p1);
-            MakeRounded(p1, 7);
-
-            AddText(contentPanel, "2", 615, 593, 10, true, Color.FromArgb(71, 85, 105));
-            AddText(contentPanel, "3", 655, 593, 10, true, Color.FromArgb(71, 85, 105));
-            AddText(contentPanel, "›", 700, 590, 18, true, Color.FromArgb(37, 99, 235));
-        }
-
-        void AddFilterBox(string text, int x, int y, int w)
-        {
-            Button box = new Button();
-            box.Text = text;
-            box.Font = new Font("Segoe UI", 9, FontStyle.Bold);
-            box.ForeColor = Color.FromArgb(71, 85, 105);
-            box.BackColor = Color.White;
-            box.FlatStyle = FlatStyle.Flat;
-            box.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
-            box.Size = new Size(w, 42);
-            box.Location = new Point(x, y);
-            contentPanel.Controls.Add(box);
-            MakeRounded(box, 8);
-        }
-
-        void AddLaporanStatCard(int x, int y, Image icon, string title, string value, string desc, Color bg, Color color)
-        {
-            Panel card = RoundedPanel(180, 90, 10, bg);
-            card.Location = new Point(x, y);
-            contentPanel.Controls.Add(card);
-
-            AddPic(card, icon, 18, 18, 24, 24);
-            AddText(card, title, 50, 18, 8, true, color);
-            AddText(card, value, 50, 40, value.Length > 5 ? 14 : 18, true);
-            if (desc != "")
-                AddText(card, desc, 50, 67, 8, false);
-        }
-
-        void AddLaporanRow(Panel table, string no, string tanggal, string studio, string penyewa, string waktu, string durasi, string total, string status, string pembayaran, int y, bool selesai)
-        {
-            AddText(table, no, 25, y + 10, 9, false);
-            AddText(table, tanggal, 95, y + 10, 9, false);
-            AddText(table, studio, 245, y + 10, 9, true);
-            AddText(table, penyewa, 365, y + 10, 9, false);
-            AddText(table, waktu, 525, y + 10, 9, false);
-            AddText(table, durasi, 665, y + 10, 9, false);
-            AddText(table, total, 775, y + 10, 9, false);
-
-            Label st = new Label();
-            st.Text = status;
-            st.Font = new Font("Segoe UI", 8, FontStyle.Bold);
-            st.ForeColor = selesai ? Color.FromArgb(22, 163, 74) : Color.FromArgb(245, 158, 11);
-            st.BackColor = selesai ? Color.FromArgb(220, 252, 231) : Color.FromArgb(255, 247, 237);
-            st.TextAlign = ContentAlignment.MiddleCenter;
-            st.Size = new Size(80, 25);
-            st.Location = new Point(895, y + 5);
-            table.Controls.Add(st);
-            MakeRounded(st, 8);
-
-            AddText(table, pembayaran, 1030, y + 3, 8, false);
-
-            AddLine(table, 0, y + 45, 1155);
-        }
-
-        void AddPageTitle(string title, string subtitle)
-        {
-            AddText(contentPanel, title, 50, 70, 26, true);
-            AddText(contentPanel, subtitle, 53, 125, 12, false, Color.FromArgb(100, 116, 139));
+            Button b = new Button();
+            b.Text = text;
+            b.Font = new Font("Segoe UI", 9, FontStyle.Bold);
+            b.ForeColor = fg;
+            b.BackColor = bg;
+            b.FlatStyle = FlatStyle.Flat;
+            b.FlatAppearance.BorderSize = 0;
+            b.Size = new Size(w, h);
+            b.Location = new Point(x, y);
+            if (click != null) b.Click += click;
+            p.Controls.Add(b);
+            MakeRounded(b, 9);
         }
 
         void Logout()
         {
-            this.Close();
+            Close();
             Form1 login = new Form1();
             login.Show();
         }
 
-        void AddText(Control parent, string text, int x, int y, int size, bool bold, Color? color = null)
+        void AddLabel(Control p, string text, int x, int y, int size, bool bold, Color color)
         {
             Label lbl = new Label();
             lbl.Text = text;
             lbl.Font = new Font("Segoe UI", size, bold ? FontStyle.Bold : FontStyle.Regular);
-            lbl.ForeColor = color ?? Color.FromArgb(15, 23, 42);
+            lbl.ForeColor = color;
             lbl.AutoSize = true;
-            lbl.Location = new Point(x, y);
             lbl.BackColor = Color.Transparent;
-            parent.Controls.Add(lbl);
+            lbl.Location = new Point(x, y);
+            p.Controls.Add(lbl);
         }
 
-        void AddPic(Control parent, Image img, int x, int y, int w, int h)
-        {
-            PictureBox pic = new PictureBox();
-            pic.Image = img;
-            pic.Location = new Point(x, y);
-            pic.Size = new Size(w, h);
-            pic.SizeMode = PictureBoxSizeMode.Zoom;
-            pic.BackColor = Color.Transparent;
-            parent.Controls.Add(pic);
-            pic.BringToFront();
-        }
-
-        void AddLine(Control parent, int x, int y, int w)
+        void AddLine(Control p, int x, int y, int w)
         {
             Panel line = new Panel();
-            line.BackColor = Color.FromArgb(225, 232, 240);
-            line.Size = new Size(w, 1);
+            line.BackColor = Color.FromArgb(220, 228, 240);
             line.Location = new Point(x, y);
-            parent.Controls.Add(line);
+            line.Size = new Size(w, 1);
+            p.Controls.Add(line);
         }
 
         Panel RoundedPanel(int w, int h, int r, Color color)
@@ -723,27 +710,19 @@ namespace Triosik
             Panel p = new Panel();
             p.Size = new Size(w, h);
             p.BackColor = color;
-
-            GraphicsPath path = new GraphicsPath();
-            path.AddArc(0, 0, r * 2, r * 2, 180, 90);
-            path.AddArc(w - r * 2, 0, r * 2, r * 2, 270, 90);
-            path.AddArc(w - r * 2, h - r * 2, r * 2, r * 2, 0, 90);
-            path.AddArc(0, h - r * 2, r * 2, r * 2, 90, 90);
-            path.CloseFigure();
-
-            p.Region = new Region(path);
+            MakeRounded(p, r);
             return p;
         }
 
-        void MakeRounded(Control control, int radius)
+        void MakeRounded(Control c, int r)
         {
             GraphicsPath path = new GraphicsPath();
-            path.AddArc(0, 0, radius * 2, radius * 2, 180, 90);
-            path.AddArc(control.Width - radius * 2, 0, radius * 2, radius * 2, 270, 90);
-            path.AddArc(control.Width - radius * 2, control.Height - radius * 2, radius * 2, radius * 2, 0, 90);
-            path.AddArc(0, control.Height - radius * 2, radius * 2, radius * 2, 90, 90);
+            path.AddArc(0, 0, r * 2, r * 2, 180, 90);
+            path.AddArc(c.Width - r * 2, 0, r * 2, r * 2, 270, 90);
+            path.AddArc(c.Width - r * 2, c.Height - r * 2, r * 2, r * 2, 0, 90);
+            path.AddArc(0, c.Height - r * 2, r * 2, r * 2, 90, 90);
             path.CloseFigure();
-            control.Region = new Region(path);
+            c.Region = new Region(path);
         }
     }
 }

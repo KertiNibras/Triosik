@@ -225,9 +225,9 @@ namespace Triosik
                             }
                             else if (cmbRole.Text == "Kasir")
                             {
-                                /*DashboardKasir kasirForm = new DashboardKasir();
+                                DashboardKasir kasirForm = new DashboardKasir();
                                 kasirForm.Show();
-                                this.Hide();*/
+                                this.Hide();
                             }
                         }
                         else
